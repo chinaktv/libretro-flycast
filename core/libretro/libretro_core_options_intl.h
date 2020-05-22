@@ -348,7 +348,7 @@ struct retro_core_option_definition option_defs_chs[] = {
    },
    {
       CORE_OPTION_NAME "_mipmapping",
-      "贴图mip映射",
+      "mip映射",
       "",
       {
          { "enabled",  "启用" },
@@ -360,7 +360,7 @@ struct retro_core_option_definition option_defs_chs[] = {
    {
       CORE_OPTION_NAME "_volume_modifier_enable",
       "体积修饰器",
-      "这是一个Dreamcast GPU的功能，一般被游戏用来绘制物体阴影。\n此项正常应该被启用 - 对性能的影响通常很小以致可以忽略不计。",
+      "这是Dreamcast GPU的一项功能，通常被游戏用来绘制物体阴影。\n正常情况下此项应该被启用 - 对性能的影响通常很小，基本可以忽略不计。",
       {
          { "enabled",  "启用" },
          { "disabled", "禁用" },
