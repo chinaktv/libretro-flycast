@@ -3156,7 +3156,9 @@ Games[] =
             { "mpr-22218.ic11",  0x5800000, 0x0800000, 0x00000000 },
             { "mpr-22219.ic12s", 0x6000000, 0x0800000, 0x00000000 },
             { NULL, 0, 0, 0x00000000 },
-        }
+        },
+		  NULL,
+		  &marine_fishing_std_inputs,
     },
     // Spawn In the Demon's Hand (JPN, USA, EUR, ASI, AUS) (Rev B)
     {
@@ -4261,7 +4263,7 @@ Games[] =
     // Pokasuka Ghost *** BAD DUMP ***
     {
         "pokasuka",
-        NULL,
+        "manicpnc",
         0x14000000,
         0x5505,
         "naomi",
@@ -4269,18 +4271,18 @@ Games[] =
         REGION_JAPAN,
         ROT0,
         {
-            { "fpr-24365.ic8",  0x00000000, 0x4000000, 0x00000000 },
-            { "fpr-24366.ic9",  0x04000000, 0x4000000, 0x00000000 },
-            { "fpr-24367.ic10", 0x08000000, 0x4000000, 0x00000000 },
-            { "fpr-24368.ic11", 0x0c000000, 0x4000000, 0x00000000 },
-            { "fpr-24369.ic12", 0x10000000, 0x4000000, 0x00000000 },
+            { "fpr-24365.ic8",  0x00000000, 0x4000000, 0x11489cda },
+            { "fpr-24366.ic9",  0x04000000, 0x4000000, 0x7429714a },
+            { "fpr-24367.ic10", 0x08000000, 0x4000000, 0xdee87bab },
+            { "fpr-24368.ic11", 0x0c000000, 0x4000000, 0x124f55e2 },
+            { "fpr-24369.ic12", 0x10000000, 0x4000000, 0x35b544ab },
             
             //ROM_REGION( 0x200000, "ioboard", 0) // touch screen I/O board, program disassembles as little-endian SH-4
             //ROM_LOAD( "fpr24351.ic14", 0x000000, 0x200000, CRC(4d1b7b89) SHA1(965b8c6b5a2e7b3f1b1e2eac19c86000c3b66754) )
             
             //ROM_REGION( 0x800, "pic_readout", 0 )
             //ROM_LOAD( "317-0461-com.ic3", 0, 0x800, BAD_DUMP CRC(c9282cdd) SHA1(23933e489d763515428e2714cc6e7676df1d5323) )
-            { "317-0461-com.ic3", 0, 0x800, 0x00000000, Key },
+            { "317-0461-com.ic3", 0, 0x800, 0xc9282cdd, Key },
             
             { NULL, 0, 0, 0x00000000 },
         }
@@ -5025,6 +5027,44 @@ Games[] =
         },
         "gds-0031",
     },
+	 // Puyo Puyo Fever (Prototype)
+	 {
+		  "puyofevp",
+		  "puyofev",
+		  0x0c000000,
+		  0xff9d4d3c,
+		  "naomi",
+		  M1,
+		  REGION_JAPAN,
+		  ROT0,
+		  {
+				  { "ic17s.bin", 0x01000000, 0x800000, 0xf51ce63b, InterleavedWord },
+				  { "ic18s.bin", 0x01000002, 0x800000, 0x7109decc, InterleavedWord },
+				  { "ic19s.bin", 0x02000000, 0x800000, 0xa58efa9c, InterleavedWord },
+				  { "ic20s.bin", 0x02000002, 0x800000, 0x6dee24b2, InterleavedWord },
+				  { "ic21s.bin", 0x03000000, 0x800000, 0x9a0564c2, InterleavedWord },
+				  { "ic22s.bin", 0x03000002, 0x800000, 0xdf692133, InterleavedWord },
+				  { "ic23s.bin", 0x04000000, 0x800000, 0x61c98256, InterleavedWord },
+				  { "ic24s.bin", 0x04000002, 0x800000, 0xc7e8ec24, InterleavedWord },
+				  { "ic25s.bin", 0x05000000, 0x800000, 0x2cb47ef5, InterleavedWord },
+				  { "ic26s.bin", 0x05000002, 0x800000, 0xf5b477d5, InterleavedWord },
+				  { "ic27s.bin", 0x06000000, 0x800000, 0x22c07470, InterleavedWord },
+				  { "ic28s.bin", 0x06000002, 0x800000, 0x018233e0, InterleavedWord },
+				  { "ic29s.bin", 0x07000000, 0x800000, 0x96101b95, InterleavedWord },
+				  { "ic30s.bin", 0x07000002, 0x800000, 0x16dff39b, InterleavedWord },
+				  { "ic31s.bin", 0x08000000, 0x800000, 0x510c03dd, InterleavedWord },
+				  { "ic32s.bin", 0x08000002, 0x800000, 0xb184e263, InterleavedWord },
+				  { "ic33s.bin", 0x09000000, 0x800000, 0xbe2a164b, InterleavedWord },
+				  { "ic34s.bin", 0x09000002, 0x800000, 0x01e0a163, InterleavedWord },
+				  { "ic35s.bin", 0x0a000000, 0x800000, 0xae0c1caa, InterleavedWord },
+				  { "ic36s.bin", 0x0a000002, 0x800000, 0x6de8d5c7, InterleavedWord },
+				  { "ic37s.bin", 0x0b000000, 0x800000, 0xfc89454c, InterleavedWord },
+				  { "ic38s.bin", 0x0b000002, 0x800000, 0x86954476, InterleavedWord },
+				  { "copy",      0x00400000, 0xc00000, 0x0000000, Copy, 0x1000000 },
+
+				  { NULL, 0, 0, 0x00000000 },
+		  },
+	 },
     // Quiz Keitai Q mode (GDL-0017)
     {
         "quizqgd",

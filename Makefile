@@ -9,7 +9,7 @@ NO_THREADS    := 0
 NO_EXCEPTIONS := 0
 NO_NVMEM      := 0
 NO_VERIFY     := 1
-HAVE_LTCG     ?= 1
+HAVE_LTCG     ?= 0
 HAVE_GENERIC_JIT := 1
 HAVE_GL3      := 0
 FORCE_GLES    := 0
@@ -538,6 +538,7 @@ else ifeq ($(platform), rockpro64)
 	PLATFORM_EXT := unix
 	WITH_DYNAREC=arm
 	HAVE_GENERIC_JIT = 0
+	HAVE_LTCG = 0
 
 # Tinkerboard
 else ifeq ($(platform), tinkerboard)
