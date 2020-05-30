@@ -318,10 +318,10 @@ struct retro_core_option_definition option_defs_chs[] = {
       "Alpha排序",
       "",
       {
-         { "per-strip (fast, least accurate)", "每条带（快速，最低精度）" },
+         { "per-strip (fast, least accurate)", "每折线（快速，最低精度）" },
          { "per-triangle (normal)",            "每三角形（正常）" },
 #if defined(HAVE_OIT) || defined(HAVE_VULKAN)
-         { "per-pixel (accurate)",             "每像素（精确，但最慢）" },
+         { "per-pixel (accurate)",             "每像素（高精度，最慢）" },
 #endif
          { NULL, NULL },
       },
@@ -525,7 +525,7 @@ struct retro_core_option_definition option_defs_chs[] = {
    },
    {
       CORE_OPTION_NAME "_digital_triggers",
-      "数字触发键",
+      "数字扳机键",
       "",
       {
          { "disabled", "禁用" },
@@ -567,7 +567,7 @@ struct retro_core_option_definition option_defs_chs[] = {
    {
       CORE_OPTION_NAME "_pvr2_filtering",
       "PowerVR2后处理滤镜",
-      "Post-process the rendered image to simulate effects specific to the PowerVR2 GPU and analog video signals.",
+      "对渲染图像进行后处理以模拟PowerVR2 GPU的特定效果和模拟信号输出的效果。",
       {
          { "disabled", "禁用" },
          { "enabled",  "启用" },
@@ -578,7 +578,7 @@ struct retro_core_option_definition option_defs_chs[] = {
 #ifdef HAVE_TEXUPSCALE
    {
       CORE_OPTION_NAME "_texupscale",
-      "贴图放大 (xBRZ)",
+      "纹理放大 (xBRZ)",
       "增强2D手绘图形质量。应该只用于2D像素游戏。",
       {
          { "off", "关闭" },
@@ -591,7 +591,7 @@ struct retro_core_option_definition option_defs_chs[] = {
    },
    {
       CORE_OPTION_NAME "_texupscale_max_filtered_texture_size",
-      "贴图放大最大过滤尺寸",
+      "纹理放大最大过滤尺寸",
       "",
       {
          { "256",  NULL },
@@ -604,7 +604,7 @@ struct retro_core_option_definition option_defs_chs[] = {
 #endif
    {
       CORE_OPTION_NAME "_enable_rttb",
-      "启用RTT（渲染到贴图）缓存",
+      "启用RTT（渲染到纹理）缓存",
       "",
       {
          { "disabled", "禁用" },
@@ -631,7 +631,7 @@ struct retro_core_option_definition option_defs_chs[] = {
    {
       CORE_OPTION_NAME "_threaded_rendering",
       "多线程渲染（须重启）",
-      "用不同的线程运行GPU和CPU。高度推荐。",
+      "用不同的线程运行GPU和CPU，高度推荐。",
       {
          { "disabled", "禁用" },
          { "enabled",  "启用" },
