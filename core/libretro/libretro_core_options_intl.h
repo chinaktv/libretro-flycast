@@ -467,19 +467,15 @@ struct retro_core_option_definition option_defs_chs[] = {
    },
    {
       CORE_OPTION_NAME "_div_matching",
-      "DIV匹配（高性能，低精度）",
-      "",
+      "DIV匹配",
+      "优化整数除法。",
       {
          { "disabled", "禁用" },
          { "auto",     "自动" },
          { NULL, NULL },
       },
-#ifdef LOW_END
       "auto",
-#else
-      "disabled",
-#endif
-   },
+   },   
    {
       CORE_OPTION_NAME "_force_wince",
       "强制Windows CE模式",
