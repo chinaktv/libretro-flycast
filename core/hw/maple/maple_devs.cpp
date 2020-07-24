@@ -333,10 +333,36 @@ struct maple_atomiswave_controller : maple_sega_controller
 		if (index < 2 || index > 5)
 			return 0x80;
 		index -= 2;
-   	if (naomi_game_inputs != NULL && naomi_game_inputs->axes[index].name != NULL && naomi_game_inputs->axes[index].inverted)
-	   	return pjs.joy[index] == 0x80 ? 0xff : 128 - pjs.joy[index];
-   	else
-   		return pjs.joy[index] - 128;
+		u8 val;
+		if (naomi_game_inputs != NULL && naomi_game_inputs->axes[index].name != NULL)
+		{
+			switch (naomi_game_inputs->axes[index].axis)
+			{
+			case 0:
+				val = pjs.joy[0] - 0x80;
+				break;
+			case 1:
+				val = pjs.joy[1] - 0x80;
+				break;
+			case 2:
+				val = pjs.joy[2] - 0x80;
+				break;
+			case 3:
+				val = pjs.joy[3] - 0x80;
+				break;
+			case 4:
+				val = pjs.trigger[1];
+				break;
+			case 5:
+				val = pjs.trigger[0];
+				break;
+			}
+			if (naomi_game_inputs->axes[index].inverted)
+				val = 0xff - val;
+		}
+		else
+			val = pjs.joy[index] - 0x80;
+		return val;
 	}
 };
 
@@ -1221,16 +1247,10 @@ struct maple_keyboard : maple_base
 			//1	direction
 			w8(0);
          // Product name (30)
-			for (u32 i = 0; i < 30; i++)
-			{
-				w8((u8)maple_sega_kbd_name[i]);
-			}
+			wstr(maple_sega_kbd_name, 30);
 
          // License (60)
-			for (u32 i = 0; i < 60; i++)
-			{
-				w8((u8)maple_sega_brand[i]);
-			}
+			wstr(maple_sega_brand, 60);
 
          // Low-consumption standby current (2)
 			w16(0x01AE);
@@ -1310,15 +1330,11 @@ struct maple_mouse : maple_base
 			//1	direction
 			w8(0);
 			// Product name (30)
-			for (u32 i = 0; i < 30; i++)
-			{
-				w8((u8)maple_sega_mouse_name[i]);
-			}
+			wstr(maple_sega_mouse_name, 30);
+
  			// License (60)
-			for (u32 i = 0; i < 60; i++)
-			{
-				w8((u8)maple_sega_brand[i]);
-			}
+			wstr(maple_sega_brand, 60);
+
  			// Low-consumption standby current (2)
 			w16(0x0069);
  			// Maximum current consumption (2)
@@ -1393,16 +1409,10 @@ struct maple_lightgun : maple_base
 		 //1	direction
 		 w8(0);
 		 // Product name (30)
-		 for (u32 i = 0; i < 30; i++)
-		 {
-			w8((u8)maple_sega_lightgun_name[i]);
-		 }
+		 wstr(maple_sega_lightgun_name, 30);
 
 		 // License (60)
-		 for (u32 i = 0; i < 60; i++)
-		 {
-			w8((u8)maple_sega_brand[i]);
-		 }
+		 wstr(maple_sega_brand, 60);
 
 		 // Low-consumption standby current (2)
 		 w16(0x0069);	// 10.5 mA

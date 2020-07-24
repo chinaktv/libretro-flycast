@@ -37,6 +37,7 @@ char* strdup(const char *str)
 #ifdef HAVE_VULKAN
 #include "rend/vulkan/vulkan_context.h"
 #endif
+#include "emulator.h"
 #include "../rend/rend.h"
 #include "../hw/sh4/sh4_mem.h"
 #include "../hw/sh4/sh4_sched.h"
@@ -173,14 +174,7 @@ retro_environment_t        environ_cb = NULL;
 retro_environment_t        frontend_clear_thread_waits_cb = NULL;
 static retro_rumble_interface rumble;
 
-int dc_init(int argc,wchar* argv[]);
-void dc_reset();
-void dc_run();
-void dc_term(void);
-void dc_stop();
-void dc_start();
 void FlushCache();	// Arm dynarec (arm and x86 only)
-bool dc_is_running();
 bool rend_single_frame();
 void rend_cancel_emu_wait();
 bool acquire_mainloop_lock();
@@ -188,9 +182,6 @@ bool acquire_mainloop_lock();
 static void refresh_devices(bool first_startup);
 static void init_disk_control_interface(void);
 static bool read_m3u(const char *file);
-
-static int co_argc;
-static wchar** co_argv;
 
 char *game_data;
 char g_base_name[128];
@@ -1790,8 +1781,20 @@ static bool set_opengl_hw_render(u32 preferred)
 	if (settings.pvr.rend == 3)
 	{
 		params.context_type          = (retro_hw_context_type)preferred;
-		params.major                 = 4;
-		params.minor                 = 3;
+		if (preferred == RETRO_HW_CONTEXT_OPENGL)
+		{
+			// There are some weirdness with RA's gl context's versioning :
+			// - any value above 3.0 won't provide a valid context, while the GLSM_CTL_STATE_CONTEXT_INIT call returns true...
+			// - the only way to overwrite previously set version with zero values is to set them directly in hw_render, otherwise they are ignored (see glsm_state_ctx_init logic)
+			retro_hw_render_callback hw_render;
+			hw_render.version_major = 3;
+			hw_render.version_minor = 0;
+		}
+		else
+		{
+			params.major = 4;
+			params.minor = 3;
+		}
 	}
 	else
 	{
@@ -1841,7 +1844,7 @@ bool retro_load_game(const struct retro_game_info *game)
    snprintf(g_roms_dir, sizeof(g_roms_dir), "%s%c", game_dir, slash);
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE, &rumble) && log_cb)
-        log_cb(RETRO_LOG_INFO, "Rumble interface supported!\n");
+        log_cb(RETRO_LOG_DEBUG, "Rumble interface supported!\n");
 
    if (!(environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &dir) && dir))
       dir = game_dir;
@@ -1916,6 +1919,8 @@ bool retro_load_game(const struct retro_game_info *game)
 	  else
 		 return false;
    }
+   if (settings.System != DC_PLATFORM_DREAMCAST)
+   	boot_to_bios = false;
 
    if (!boot_to_bios)
    {
@@ -2021,7 +2026,7 @@ bool retro_load_game(const struct retro_game_info *game)
 
    dc_prepare_system();
 
-   if (dc_init(co_argc,co_argv))
+   if (dc_init())
    {
    	ERROR_LOG(BOOT, "Flycast emulator initialization failed");
    	return false;
@@ -3219,15 +3224,20 @@ int msgboxf(const char* text, unsigned int type, ...)
    if (log_cb)
    {
       va_list args;
-
       char temp[2048];
 
-      va_start(args, type);
-      vsprintf(temp, text, args);
-      va_end(args);
-      strcat(temp, "\n");
-
-      log_cb(RETRO_LOG_INFO, temp);
+      switch (type)
+      {
+         case MBX_ICONERROR:
+            va_start(args, type);
+            vsprintf(temp, text, args);
+            va_end(args);
+            strcat(temp, "\n");
+            log_cb(RETRO_LOG_ERROR, temp);
+            break;
+         default:
+            break;
+      }
    }
    return 0;
 }
@@ -3444,7 +3454,10 @@ static bool read_m3u(const char *file)
          char disk_label[PATH_MAX];
          disk_label[0] = '\0';
 
-         snprintf(name, sizeof(name), "%s%s", g_roms_dir, line);
+         if (path_is_absolute(line))
+         	snprintf(name, sizeof(name), "%s", line);
+         else
+         	snprintf(name, sizeof(name), "%s%s", g_roms_dir, line);
          disk_paths.push_back(name);
 
          fill_short_pathname_representation(disk_label, name, sizeof(disk_label));

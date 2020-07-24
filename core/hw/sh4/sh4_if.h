@@ -87,6 +87,7 @@ enum Sh4RegType
 	reg_fpscr,
 	
 	reg_pc_dyn,        //Write only, for dynarec only (dynamic block exit address)
+	reg_temp,
 
 	sh4_reg_count,
 
@@ -342,20 +343,18 @@ struct Sh4Context
 			sr_status_t old_sr;
 			fpscr_t old_fpscr;
 
-			volatile u32 CpuRunning;
+			u32 CpuRunning;
 
 			int sh4_sched_next;
 			u32 interrupt_pend;
 
 			u32 exception_pc;
+			u32 temp_reg;
 		};
 		u64 raw[64-8];
 	};
 
 };
-
-u32 sh4context_offset_u32(u32 sh4_reg);
-u32 sh4context_offset_regtype(Sh4RegType sh4_reg);
 
 void DYNACALL do_sqw_mmu(u32 dst);
 extern "C" void DYNACALL do_sqw_nommu_area_3(u32 dst, u8* sqb);
