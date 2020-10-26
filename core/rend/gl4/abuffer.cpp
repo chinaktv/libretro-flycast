@@ -5,7 +5,6 @@
  *      Author: raph
  */
 #include "gl4.h"
-#include "rend/gles/glcache.h"
 
 GLuint pixels_buffer;
 GLuint pixels_pointers;
@@ -503,6 +502,7 @@ void renderABuffer()
 
 	glcache.Disable(GL_DEPTH_TEST);
 	glcache.Disable(GL_CULL_FACE);
+	glcache.Disable(GL_SCISSOR_TEST);
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_BUFFER_UPDATE_BARRIER_BIT);
 
 	abufferDrawQuad();

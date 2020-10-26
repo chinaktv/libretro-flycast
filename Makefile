@@ -1,4 +1,6 @@
 DEBUG         := 0
+DEBUG_ASAN    := 0
+DEBUG_UBSAN   := 0
 NO_REND       := 0
 HAVE_GL       := 1
 HAVE_GL2      := 0
@@ -172,7 +174,7 @@ else ifneq (,$(findstring rpi,$(platform)))
 		ifneq (,$(findstring rpi4_64,$(platform)))
 			# 64-bit userspace
 			ARM_FLOAT_ABI_HARD = 0
-			CPUFLAGS += -DHOST_CPU=0x20000006 -DTARGET_LINUX_ARMv8 -frename-registers
+			CPUFLAGS += -DTARGET_LINUX_ARMv8 -frename-registers
 			CFLAGS += -march=armv8-a+crc -mcpu=cortex-a72 -mtune=cortex-a72 $(CPUFLAGS)
 			CXXFLAGS += -march=armv8-a+crc -mcpu=cortex-a72 -mtune=cortex-a72 $(CPUFLAGS)
 			ASFLAGS += $(CFLAGS) -c -frename-registers -fno-strict-aliasing -ffast-math -ftree-vectorize
@@ -211,7 +213,6 @@ else ifneq (,$(findstring rpi,$(platform)))
 
 # Classic Platforms #####################
 # Platform affix = classic_<ISA>_<µARCH>
-# Help at https://modmyclassic.com/comp
 #########################################
 # (armv7 a7, hard point, neon based) ####
 # NESC, SNESC, C64 mini 
@@ -372,7 +373,7 @@ else ifeq ($(platform), arm64)
 	ARM_FLOAT_ABI_HARD = 0
 	FORCE_GLES = 1
 	SINGLE_PREC_FLAGS = 1
-	CPUFLAGS += -DHOST_CPU=0x20000006 -DTARGET_LINUX_ARMv8 -frename-registers
+	CPUFLAGS += -DTARGET_LINUX_ARMv8 -frename-registers
 	CFLAGS += $(CPUFLAGS)
 	CXXFLAGS += $(CPUFLAGS)
 	ASFLAGS += $(CFLAGS) -c -frename-registers -fno-strict-aliasing -ffast-math -ftree-vectorize
@@ -395,7 +396,7 @@ else ifeq ($(platform), jetson-nano)
 	LIBS += -lrt
 	ARM_FLOAT_ABI_HARD = 0
 	SINGLE_PREC_FLAGS = 1
-	CPUFLAGS += -DHOST_CPU=0x20000006 -DTARGET_LINUX_ARMv8 -frename-registers
+	CPUFLAGS += -DTARGET_LINUX_ARMv8 -frename-registers
 	CFLAGS += -march=armv8-a+crc -mtune=cortex-a57 -mcpu=cortex-a57+crc+fp+simd $(CPUFLAGS)
 	CXXFLAGS += -march=armv8-a+crc -mtune=cortex-a57 -mcpu=cortex-a57+crc+fp+simd $(CPUFLAGS)
 	ASFLAGS += $(CFLAGS) -c -frename-registers -fno-strict-aliasing -ffast-math -ftree-vectorize
@@ -417,7 +418,7 @@ else ifeq ($(platform), libnx)
    DEFINES := -DSWITCH=1 -D__SWITCH__=1 -fcommon -DHAVE_LIBNX=1 -DTARGET_LIBNX -DTARGET_NO_OPENMP -DFEAT_NO_RWX_PAGES
    CFLAGS := $(DEFINES) -fPIE -I$(LIBNX)/include/ -I$(PORTLIBS)/include/ -isystem$(CORE_DIR)/core/deps/switch/ -ffunction-sections -fdata-sections -ftls-model=local-exec
    CPUFLAGS += -march=armv8-a -mtune=cortex-a57 -mtp=soft -mcpu=cortex-a57+crc+fp+simd -ffast-math -frename-registers -funroll-loops -ftree-vectorize
-   CFLAGS += $(CPUFLAGS) -DTARGET_LIBNX -DHOST_CPU=0x20000006 -DTARGET_NO_AREC
+   CFLAGS += $(CPUFLAGS) -DTARGET_LIBNX -DTARGET_NO_AREC
    WITH_DYNAREC=arm64
    HAVE_GENERIC_JIT = 0
    STATIC_LINKING = 1
@@ -439,7 +440,7 @@ else ifeq ($(platform), odroid-n2)
 	ARM_FLOAT_ABI_HARD = 0
 	FORCE_GLES = 1
 	SINGLE_PREC_FLAGS = 1
-	CPUFLAGS += -DHOST_CPU=0x20000006 -DTARGET_LINUX_ARMv8 -frename-registers
+	CPUFLAGS += -DTARGET_LINUX_ARMv8 -frename-registers
 	CFLAGS += -mcpu=cortex-a73 -mtune=cortex-a73.cortex-a53 $(CPUFLAGS)
 	CXXFLAGS += -mcpu=cortex-a73 -mtune=cortex-a73.cortex-a53 $(CPUFLAGS)
 	ASFLAGS += $(CFLAGS) -c -frename-registers -fno-strict-aliasing -ffast-math -ftree-vectorize
@@ -854,6 +855,10 @@ ifeq ($(WITH_DYNAREC), arm)
 	HOST_CPU_FLAGS = -DHOST_CPU=$(HOST_CPU_ARM)
 endif
 
+ifeq ($(WITH_DYNAREC), $(filter $(WITH_DYNAREC), arm64 aarch64))
+	HOST_CPU_FLAGS = -DHOST_CPU=$(HOST_CPU_ARM64)
+endif
+
 ifeq ($(WITH_DYNAREC), mips)
 	HOST_CPU_FLAGS = -DHOST_CPU=$(HOST_CPU_MIPS)
 endif
@@ -882,6 +887,19 @@ include Makefile.common
 
 ifeq ($(WITH_DYNAREC), x86)
 	HAVE_LTCG = 0
+endif
+
+ifeq ($(DEBUG_ASAN),1)
+	DEBUG           = 1
+	DEBUG_UBSAN     = 0
+	LDFLAGS        += -lasan -fsanitize=address
+	CFLAGS         += -fsanitize=address
+endif
+
+ifeq ($(DEBUG_UBSAN),1)
+	DEBUG           = 1
+	CFLAGS         += -fsanitize=undefined
+	LDFLAGS        += -lubsan -fsanitize=undefined
 endif
 
 ifeq ($(DEBUG),1)

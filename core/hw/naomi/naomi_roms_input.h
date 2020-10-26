@@ -363,7 +363,7 @@ InputDescriptors tokyobus_inputs = {
 	  },
 };
 
-static InputDescriptors wrungp_inputs = {
+InputDescriptors wrungp_inputs = {
 	  {
 			{ NAOMI_UP_KEY, "VIEW" },
 			NAO_START_DESC
@@ -379,7 +379,7 @@ static InputDescriptors wrungp_inputs = {
 	  },
 };
 
-static InputDescriptors marine_fishing_std_inputs = {
+InputDescriptors marine_fishing_inputs = {
 	  {
 			{ NAOMI_START_KEY, "CAST" },
 			{ NAOMI_UP_KEY, "LURE" },
@@ -397,24 +397,51 @@ static InputDescriptors marine_fishing_std_inputs = {
 	  },
 };
 
-static InputDescriptors marine_fishing_dlx_inputs = {
+InputDescriptors f355_inputs = {
 	  {
-			{ NAOMI_RIGHT_KEY, "ROD LEFT" },
-			{ NAOMI_LEFT_KEY, "ROD RIGHT" },
-			{ NAOMI_BTN0_KEY, "ROD UP" },
-			{ NAOMI_BTN1_KEY, "ROD DOWN" },
-			{ NAOMI_BTN4_KEY, "LURE" },
-			{ NAOMI_BTN5_KEY, "CAST" },
+			{ NAOMI_BTN0_KEY, "ASSIST SC" },
+			{ NAOMI_BTN1_KEY, "ASSIST TC" },
+			{ NAOMI_BTN2_KEY, "ASSIST ABS" },
+			{ NAOMI_BTN3_KEY, "ASSIST IBS", NAOMI_BTN1_KEY },
+			{ NAOMI_BTN4_KEY, "WING SHIFT L", NAOMI_DOWN_KEY },
+			{ NAOMI_BTN5_KEY, "WING SHIFT R", NAOMI_UP_KEY },
+
+			// Manual gearshift (Deluxe only)
+			//    L   R
+			//  U 1 3 5
+			//
+			//  D 2 4 6
+			{ NAOMI_UP_KEY, "SPEED SHIFT UP" },
+			{ NAOMI_DOWN_KEY, "SPEED SHIFT DOWN" },
+			{ NAOMI_LEFT_KEY, "SPEED SHIFT LEFT" },
+			{ NAOMI_RIGHT_KEY, "SPEED SHIFT RIGHT" },
+
+			NAO_START_DESC
 			NAO_BASE_BTN_DESC
 			{ 0 },
 	  },
 	  {
-			{ "PULL POSITION", Full, 1 },
-			{ "SWING POSITION", Full, 0 },
-			{ "STICK X", Full, 2 },
-			{ "STICK Y", Full, 3 },
-			{ "REEL SPEED", Half, 4 },
-			{ "TENSION", Half, 5 },
+			{ "ACCEL", Half, 0 },
+			{ "BRAKE", Half, 1 },
+			{ "CLUTCH", Full, 2 },	// Deluxe only
+			{ "unused", Full, 4 },
+			{ "HANDLE", Full, 0 },
+			{ NULL },
+	  },
+};
+
+InputDescriptors zombie_inputs = {
+	  {
+			{ NAOMI_BTN0_KEY, "BTN0" },
+			{ NAOMI_BTN1_KEY, "BTN1" },
+			{ NAOMI_BTN2_KEY, "BTN2" },
+			NAO_START_DESC
+			NAO_BASE_BTN_DESC
+			{ 0 },
+	  },
+	  {
+			{ "UP - DOWN", Full, 1, true },
+			{ "LEFT - RIGHT", Full, 0, true },
 			{ NULL },
 	  },
 };
