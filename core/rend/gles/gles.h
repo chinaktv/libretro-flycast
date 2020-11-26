@@ -147,7 +147,7 @@ void SetMVS_Mode(ModifierVolumeMode mv_mode, ISP_Modvol ispc);
 void BindRTT(u32 addy, u32 fbw, u32 fbh, u32 channels, u32 fmt);
 void ReadRTTBuffer();
 void RenderFramebuffer();
-void DrawFramebuffer(float w, float h);
+void DrawFramebuffer();
 
 PipelineShader *GetProgram(bool cp_AlphaTest, bool pp_InsideClipping,
 		bool pp_Texture, bool pp_UseAlpha, bool pp_IgnoreTexA, u32 pp_ShadInstr, bool pp_Offset,
@@ -184,7 +184,7 @@ extern struct ShaderUniforms_t
 		int width;
 		int height;
 	} base_clipping;
-	float palette_index;
+	int palette_index;
 
 	void Set(const PipelineShader* s)
 	{
@@ -212,7 +212,7 @@ extern struct ShaderUniforms_t
 			glUniformMatrix4fv(s->normal_matrix, 1, GL_FALSE, &normal_mat[0][0]);
 
 		if (s->palette_index != -1)
-			glUniform1f(s->palette_index, palette_index);
+			glUniform1i(s->palette_index, palette_index);
 	}
 
 } ShaderUniforms;

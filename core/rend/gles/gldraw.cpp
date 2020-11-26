@@ -114,6 +114,7 @@ __forceinline
 		ShaderUniforms.trilinear_alpha = 1.f;
 
 	bool color_clamp = gp->tsp.ColorClamp && (pvrrc.fog_clamp_min != 0 || pvrrc.fog_clamp_max != 0xffffffff);
+	int fog_ctrl = settings.rend.Fog ? gp->tsp.FogCtrl : 2;
 
 	int clip_rect[4] = {};
 	TileClipping clipmode = GetTileClip(gp->tileclip, ViewportMatrix, clip_rect);
@@ -126,7 +127,7 @@ __forceinline
 								  gp->tsp.IgnoreTexA,
 								  gp->tsp.ShadInstr,
 								  gp->pcw.Offset,
-								  gp->tsp.FogCtrl,
+								  fog_ctrl,
 								  gp->pcw.Gouraud,
 								  gp->tcw.PixelFmt == PixelBumpMap,
 								  color_clamp,
@@ -139,10 +140,10 @@ __forceinline
 	if (palette)
 	{
 		if (gp->tcw.PixelFmt == PixelPal4)
-			ShaderUniforms.palette_index = float(gp->tcw.PalSelect << 4) / 1023.f;
+			ShaderUniforms.palette_index = gp->tcw.PalSelect << 4;
 		else
-			ShaderUniforms.palette_index = float((gp->tcw.PalSelect >> 4) << 8) / 1023.f;
-		glUniform1f(CurrentShader->palette_index, ShaderUniforms.palette_index);
+			ShaderUniforms.palette_index = (gp->tcw.PalSelect >> 4) << 8;
+		glUniform1i(CurrentShader->palette_index, ShaderUniforms.palette_index);
 	}
 
 	if (clipmode == TileClipping::Inside)
@@ -155,12 +156,14 @@ __forceinline
 	else
 		SetBaseClipping();
 
-	// This bit controls which pixels are affected
-	// by modvols
-	const u32 stencil = (gp->pcw.Shadow!=0)?0x80:0;
-	glcache.StencilFunc(GL_ALWAYS, stencil, stencil);
+	//This bit control which pixels are affected
+	//by modvols
+	const u32 stencil=(gp->pcw.Shadow!=0)?0x80:0x0;
+
+	glcache.StencilFunc(GL_ALWAYS,stencil,stencil);
 
 	glcache.BindTexture(GL_TEXTURE_2D, gp->texid == (u64)-1 ? 0 : (GLuint)gp->texid);
+
 	SetTextureRepeatMode(GL_TEXTURE_WRAP_S, gp->tsp.ClampU, gp->tsp.FlipU);
 	SetTextureRepeatMode(GL_TEXTURE_WRAP_T, gp->tsp.ClampV, gp->tsp.FlipV);
 
@@ -222,15 +225,15 @@ __forceinline
 	}
 
 	if (SortingEnabled && settings.pvr.Emulation.AlphaSortMode == 0)
-	glcache.DepthMask(GL_FALSE);
+		glcache.DepthMask(GL_FALSE);
 	else
 	{
-		// Z Write Disable seems to be ignored for punch-through polys
+		// Z Write Disable seems to be ignored for punch-through.
 		// Fixes Worms World Party, Bust-a-Move 4 and Re-Volt
-	if (Type == ListType_Punch_Through)
-		glcache.DepthMask(GL_TRUE);
-	else
-		glcache.DepthMask(!gp->isp.ZWriteDis);
+		if (Type == ListType_Punch_Through)
+			glcache.DepthMask(GL_TRUE);
+		else
+			glcache.DepthMask(!gp->isp.ZWriteDis);
 	}
 }
 
@@ -622,13 +625,13 @@ void DrawStrips()
 		vertex_buffer_unmap();
 }
 
-void DrawFramebuffer(float w, float h)
+static void DrawQuad(GLuint texId, float x, float y, float w, float h, float u0, float v0, float u1, float v1)
 {
 	struct Vertex vertices[] = {
-		{ 0, h, 0.1, { 255, 255, 255, 255 }, { 0, 0, 0, 0 }, 0, 1 },
-		{ 0, 0, 0.1, { 255, 255, 255, 255 }, { 0, 0, 0, 0 }, 0, 0 },
-		{ w, h, 0.1, { 255, 255, 255, 255 }, { 0, 0, 0, 0 }, 1, 1 },
-		{ w, 0, 0.1, { 255, 255, 255, 255 }, { 0, 0, 0, 0 }, 1, 0 },
+		{ x,     y + h, 0.1, { 255, 255, 255, 255 }, { 0, 0, 0, 0 }, u0, v1 },
+		{ x,     y,     0.1, { 255, 255, 255, 255 }, { 0, 0, 0, 0 }, u0, v0 },
+		{ x + w, y + h, 0.1, { 255, 255, 255, 255 }, { 0, 0, 0, 0 }, u1, v1 },
+		{ x + w, y,     0.1, { 255, 255, 255, 255 }, { 0, 0, 0, 0 }, u1, v0 },
 	};
 	GLushort indices[] = { 0, 1, 2, 1, 3 };
 
@@ -644,13 +647,18 @@ void DrawFramebuffer(float w, float h)
 	glcache.UseProgram(shader->program);
 
 	glActiveTexture(GL_TEXTURE0);
-	glcache.BindTexture(GL_TEXTURE_2D, fbTextureId);
+	glcache.BindTexture(GL_TEXTURE_2D, texId);
 
 	SetupMainVBO();
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STREAM_DRAW);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STREAM_DRAW);
 
 	glDrawElements(GL_TRIANGLE_STRIP, 5, GL_UNSIGNED_SHORT, (void *)0);
+}
+
+void DrawFramebuffer()
+{
+	DrawQuad(fbTextureId, 0, 0, 640.f, 480.f, 0, 0, 1, 1);
 	glcache.DeleteTextures(1, &fbTextureId);
 	fbTextureId = 0;
 }

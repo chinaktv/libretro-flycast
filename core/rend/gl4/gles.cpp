@@ -630,7 +630,7 @@ static bool RenderFrame()
 	gl4ShaderUniforms.fog_clamp_max[2] = ((pvrrc.fog_clamp_max >> 0) & 0xFF) / 255.0f;
 	gl4ShaderUniforms.fog_clamp_max[3] = ((pvrrc.fog_clamp_max >> 24) & 0xFF) / 255.0f;
 
-	if (fog_needs_update)
+	if (fog_needs_update && settings.rend.Fog)
 	{
 		fog_needs_update=false;
 		UpdateFogTexture((u8 *)FOG_TABLE, GL_TEXTURE5, GL_RED);
@@ -802,13 +802,16 @@ static bool RenderFrame()
 	else
 	{
 		glBindFramebuffer(GL_FRAMEBUFFER, output_fbo);
+
 		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 		glcache.ClearColor(0.f, 0.f, 0.f, 0.f);
 		glClear(GL_COLOR_BUFFER_BIT);
+
 		gl4DrawFramebuffer(640.f, 480.f);
 	}
 
 
+	/* VMU/Crosshair code - libretro-specific */
 	if (!is_rtt)
 	{
 		if (settings.System == DC_PLATFORM_DREAMCAST)

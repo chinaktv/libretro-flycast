@@ -159,7 +159,7 @@ uniform lowp float trilinear_alpha;
 uniform lowp vec4 fog_clamp_min;
 uniform lowp vec4 fog_clamp_max;
 uniform sampler2D palette;
-uniform mediump float palette_index;
+uniform mediump int palette_index;
 
 /* Vertex input*/
 INTERPOLATION in lowp vec4 vtx_base;
@@ -196,8 +196,8 @@ highp vec4 fog_clamp(highp vec4 col)
 
 lowp vec4 palettePixel(highp vec2 coords)
 {
-	highp vec4 c = vec4(texture(tex, coords).FOG_CHANNEL * 255.0 / 1023.0 + palette_index, 0.5, 0.0, 0.0);
-	return texture(palette, c.xy);
+	highp vec2 c = vec2((texture(tex, coords).FOG_CHANNEL * 255.0 + float(palette_index)) / 1023.0, 0.5);
+	return texture(palette, c);
 }
 
 #endif
@@ -854,7 +854,7 @@ static bool RenderFrame(void)
 	ShaderUniforms.fog_clamp_max[3] = ((pvrrc.fog_clamp_max >> 24) & 0xFF) / 255.0f;
 
 
-	if (fog_needs_update)
+	if (fog_needs_update && settings.rend.Fog)
 	{
 		fog_needs_update=false;
 		UpdateFogTexture((u8 *)FOG_TABLE, GL_TEXTURE1, gl.single_channel_format);
@@ -926,14 +926,15 @@ static bool RenderFrame(void)
 
 	bool wide_screen_on = !is_rtt && settings.rend.WideScreen && !matrices.IsClipped();
 
-	// Color is cleared by the background plane
+	//Color is cleared by the background plane
 
 	glcache.Disable(GL_SCISSOR_TEST);
-	glClearDepth(0.0);
+
 	glcache.DepthMask(GL_TRUE);
-	glStencilMask(0xFF);
+	glClearDepth(0.0);
+	glStencilMask(0xFF); glCheck();
 	glClearStencil(0);
-	glClear(GL_STENCIL_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glClear(GL_STENCIL_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); glCheck();
 
 	//move vertex to gpu
 
@@ -1027,32 +1028,33 @@ static bool RenderFrame(void)
 		if (settings.rend.PowerVR2Filter && !is_rtt)
 			postProcessor.Render(hw_render.get_current_framebuffer());
 	}
-   else
-   {
-      glcache.ClearColor(0.f, 0.f, 0.f, 0.f);
-      glClear(GL_COLOR_BUFFER_BIT);
-      glBindBuffer(GL_ARRAY_BUFFER, gl.vbo.geometry); glCheck();
-      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gl.vbo.idxs); glCheck();
-      DrawFramebuffer(640.f, 480.f);
-   }
+	else
+	{
+		glcache.ClearColor(0.f, 0.f, 0.f, 0.f);
+		glClear(GL_COLOR_BUFFER_BIT);
+		glBindBuffer(GL_ARRAY_BUFFER, gl.vbo.geometry); glCheck();
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gl.vbo.idxs); glCheck();
+		DrawFramebuffer();
+	}
 
-   if (!is_rtt)
-   {
-   	if (settings.System == DC_PLATFORM_DREAMCAST)
-   	{
+	/* VMU/Crosshair code - libretro-specific */
+	if (!is_rtt)
+	{
+		if (settings.System == DC_PLATFORM_DREAMCAST)
+		{
 			for ( vmu_screen_number = 0 ; vmu_screen_number < 4 ; vmu_screen_number++)
 				if ( vmu_screen_params[vmu_screen_number].vmu_screen_display )
 					DrawVmuTexture(vmu_screen_number);
-   	}
+		}
 
 		for ( lightgun_port = 0 ; lightgun_port < 4 ; lightgun_port++)
-				DrawGunCrosshair(lightgun_port);
-   }
+			DrawGunCrosshair(lightgun_port);
+	}
 
 	KillTex = false;
-   
-   if (is_rtt)
-      ReadRTTBuffer();
+
+	if (is_rtt)
+		ReadRTTBuffer();
 
 	return !is_rtt;
 }
