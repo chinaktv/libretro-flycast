@@ -194,7 +194,7 @@ struct retro_core_option_definition option_defs_chs[] = {
 #if ((FEAT_SHREC == DYNAREC_JIT && HOST_CPU == CPU_X86) || (HOST_CPU == CPU_ARM) || (HOST_CPU == CPU_ARM64) || (HOST_CPU == CPU_X64)) && defined(TARGET_NO_JIT)
    {
       CORE_OPTION_NAME "_cpu_mode",
-      "CPU模式（须重启）",
+      "CPU模式 (须重启) ",
       "",
       {
 #if (FEAT_SHREC == DYNAREC_JIT && HOST_CPU == CPU_X86) || (HOST_CPU == CPU_ARM) || (HOST_CPU == CPU_ARM64) || (HOST_CPU == CPU_X64)
@@ -214,8 +214,8 @@ struct retro_core_option_definition option_defs_chs[] = {
 #endif
    {
       CORE_OPTION_NAME "_boot_to_bios",
-      "启动到BIOS（须重启）",
-      "直接启动到Dreamcast BIOS菜单。",
+      "启动到BIOS (须重启) ",
+      "直接启动到Dreamcast BIOS菜单. ",
       {
          { "disabled", "禁用" },
          { "enabled",  "启用" },
@@ -225,7 +225,7 @@ struct retro_core_option_definition option_defs_chs[] = {
    },
    {
       CORE_OPTION_NAME "_system",
-      "系统类型（须重启）",
+      "系统类型 (须重启) ",
       "",
       {
          { "auto",       "自动" },
@@ -239,7 +239,7 @@ struct retro_core_option_definition option_defs_chs[] = {
    {
       CORE_OPTION_NAME "_hle_bios",
       "HLE BIOS",
-      "强制使用高级模拟BIOS。",
+      "强制使用高级模拟BIOS. ",
       {
          { "disabled",  "禁用" },
          { "enabled",  "启用" },
@@ -250,7 +250,7 @@ struct retro_core_option_definition option_defs_chs[] = {
 #if defined(HAVE_OIT) || defined(HAVE_VULKAN)
    {
       CORE_OPTION_NAME "_oit_abuffer_size",
-      "累积像素缓冲区大小（须重启）",
+      "累积像素缓冲区大小 (须重启) ",
       "",
       {
          { "512MB", NULL },
@@ -264,8 +264,8 @@ struct retro_core_option_definition option_defs_chs[] = {
 #endif
    {
       CORE_OPTION_NAME "_internal_resolution",
-      "内部分辨率（须重启）",
-      "修改渲染分辨率，需要重新启动。",
+      "内部分辨率 (须重启) ",
+      "修改渲染分辨率, 需要重新启动. ",
       {
          { "320x240",    NULL },
          { "640x480",    NULL },
@@ -297,7 +297,7 @@ struct retro_core_option_definition option_defs_chs[] = {
          { NULL, NULL },
       },
 #ifdef LOW_RES
-      "320x240",
+      "640x480",
 #else
       "640x480",
 #endif
@@ -318,23 +318,23 @@ struct retro_core_option_definition option_defs_chs[] = {
       "Alpha排序",
       "",
       {
-         { "per-strip (fast, least accurate)", "每折线（快速，最低精度）" },
-         { "per-triangle (normal)",            "每三角形（正常）" },
+         { "per-strip (fast, least accurate)", "每折线 (快速, 最低精度) " },
+         { "per-triangle (normal)",            "每三角形 (正常) " },
 #if defined(HAVE_OIT) || defined(HAVE_VULKAN)
-         { "per-pixel (accurate)",             "每像素（高精度，最慢）" },
+         { "per-pixel (accurate)",             "每像素 (高精度, 最慢) " },
 #endif
          { NULL, NULL },
       },
 #if defined(LOW_END)
       "per-strip (fast, least accurate)",
 #else
-      "per-triangle (normal)",
+      "per-strip (fast, least accurate)",
 #endif
    },
    {
       CORE_OPTION_NAME "_gdrom_fast_loading",
-      "GDROM快速载入（不精确）",
-      "加速GD-ROM载入。",
+      "GDROM快速载入 (不精确) ",
+      "加速GD-ROM载入. ",
       {
          { "disabled", "禁用" },
          { "enabled",  "启用" },
@@ -348,7 +348,7 @@ struct retro_core_option_definition option_defs_chs[] = {
    },
    {
       CORE_OPTION_NAME "_mipmapping",
-      "mip映射",
+      "MIP映射",
       "",
       {
          { "enabled",  "启用" },
@@ -360,7 +360,7 @@ struct retro_core_option_definition option_defs_chs[] = {
    {
       CORE_OPTION_NAME "_volume_modifier_enable",
       "体积修饰器",
-      "这是Dreamcast GPU的一项功能，通常被游戏用来绘制物体阴影。\n正常情况下此项应该被启用 - 对性能的影响通常很小，基本可以忽略不计。",
+      "这是Dreamcast GPU的一项功能, 通常被游戏用来绘制物体阴影. \n正常情况下此项应该被启用 - 对性能的影响通常很小, 基本可以忽略不计. ",
       {
          { "enabled",  "启用" },
          { "disabled", "禁用" },
@@ -370,7 +370,7 @@ struct retro_core_option_definition option_defs_chs[] = {
    },
    {
       CORE_OPTION_NAME "_widescreen_hack",
-      "宽屏Hack（须重启）",
+      "宽屏Hack (须重启) ",
       "",
       {
          { "disabled", "禁用" },
@@ -381,8 +381,8 @@ struct retro_core_option_definition option_defs_chs[] = {
    },
    {
       CORE_OPTION_NAME "_widescreen_cheats",
-      "宽屏Cheats（须重启）",
-      "激活作弊码方式使特定游戏以宽屏模式显示。",
+      "宽屏Cheats (须重启) ",
+      "激活作弊码方式使特定游戏以宽屏模式显示. ",
       {
          { "disabled", "禁用" },
          { "enabled",  "启用" },
@@ -423,12 +423,12 @@ struct retro_core_option_definition option_defs_chs[] = {
    {
       CORE_OPTION_NAME "_framerate",
       "帧率",
-      "影响模拟器如何和前端交互。\n"
-      "'全速' - 模拟器在每帧渲染后交还控制权给RetroArch。\n"
-      "'正常' - 模拟器在每个V-blank中断发生时交还控制权给RetroArch。\n"
-      "'全速'应该在绝大多数情况下使用。'正常'在某些系统可能会提升帧数调步，\n"
-      "但是可能造成在静态画面时输入无响应（例如载入/暂停画面）。\n"
-      "注意：此设置只有在'多线程渲染'关闭时有效。",
+      "影响模拟器如何和前端交互. \n"
+      "'全速' - 模拟器在每帧渲染后交还控制权给RetroArch. \n"
+      "'正常' - 模拟器在每个V-blank中断发生时交还控制权给RetroArch. \n"
+      "'全速'应该在绝大多数情况下使用. '正常'在某些系统可能会提升帧数调步, \n"
+      "但是可能造成在静态画面时输入无响应 (例如载入/暂停画面) . \n"
+      "注意：此设置只有在'多线程渲染'关闭时有效. ",
       {
          { "fullspeed", "全速" },
          { "normal",    "正常" },
@@ -468,7 +468,7 @@ struct retro_core_option_definition option_defs_chs[] = {
    {
       CORE_OPTION_NAME "_div_matching",
       "DIV匹配",
-      "优化整数除法。",
+      "优化整数除法. ",
       {
          { "disabled", "禁用" },
          { "auto",     "自动" },
@@ -479,7 +479,7 @@ struct retro_core_option_definition option_defs_chs[] = {
    {
       CORE_OPTION_NAME "_force_wince",
       "强制Windows CE模式",
-      "为Windows CE游戏启用完全MMU模拟以及其他设置。",
+      "为Windows CE游戏启用完全MMU模拟以及其他设置. ",
       {
          { "disabled", "禁用" },
          { "enabled",  "启用" },
@@ -533,8 +533,8 @@ struct retro_core_option_definition option_defs_chs[] = {
    {
       CORE_OPTION_NAME "_enable_dsp",
       "启用DSP",
-      "启用对Dreamcast音频DSP（数字信号处理器）的模拟。 \n"
-      "提高声音模拟的精确度，但是会增加对系统性能的要求。",
+      "启用对Dreamcast音频DSP (数字信号处理器) 的模拟.  \n"
+      "提高声音模拟的精确度, 但是会增加对系统性能的要求. ",
       {
          { "disabled", "禁用" },
          { "enabled",  "启用" },
@@ -543,13 +543,13 @@ struct retro_core_option_definition option_defs_chs[] = {
 #ifdef LOW_END
       "disabled",
 #else
-      "enabled",
+      "disabled",
 #endif
    },
    {
       CORE_OPTION_NAME "_anisotropic_filtering",
       "各向异性过滤",
-      "增强斜面视角表面贴图的质量。",
+      "增强斜面视角表面贴图的质量. ",
       {
          { "off", "关闭" },
          { "2",  "2倍" },
@@ -558,12 +558,12 @@ struct retro_core_option_definition option_defs_chs[] = {
          { "16",  "16倍" },
          { NULL, NULL },
       },
-      "4",
+      "off",
    },
    {
       CORE_OPTION_NAME "_pvr2_filtering",
       "PowerVR2后处理滤镜",
-      "对渲染图像进行后处理以模拟PowerVR2 GPU的特定效果和模拟信号输出的效果。",
+      "对渲染图像进行后处理以模拟PowerVR2 GPU的特定效果和模拟信号输出的效果. ",
       {
          { "disabled", "禁用" },
          { "enabled",  "启用" },
@@ -575,7 +575,7 @@ struct retro_core_option_definition option_defs_chs[] = {
    {
       CORE_OPTION_NAME "_texupscale",
       "纹理放大 (xBRZ)",
-      "增强2D手绘图形质量。应该只用于2D像素游戏。",
+      "增强2D手绘图形质量. 应该只用于2D像素游戏. ",
       {
          { "off", "关闭" },
          { "2x",  NULL },
@@ -600,7 +600,7 @@ struct retro_core_option_definition option_defs_chs[] = {
 #endif
    {
       CORE_OPTION_NAME "_enable_rttb",
-      "启用RTT（渲染到纹理）缓存",
+      "启用RTT (渲染到纹理) 缓存",
       "",
       {
          { "disabled", "禁用" },
@@ -626,8 +626,8 @@ struct retro_core_option_definition option_defs_chs[] = {
 #if !defined(TARGET_NO_THREADS)
    {
       CORE_OPTION_NAME "_threaded_rendering",
-      "多线程渲染（须重启）",
-      "用不同的线程运行GPU和CPU，高度推荐。",
+      "多线程渲染 (须重启) ",
+      "用不同的线程运行GPU和CPU, 高度推荐. ",
       {
          { "disabled", "禁用" },
          { "enabled",  "启用" },
@@ -638,8 +638,8 @@ struct retro_core_option_definition option_defs_chs[] = {
    {
       CORE_OPTION_NAME "_synchronous_rendering",
       "同步渲染",
-      "等待GPU完成前一帧的渲染，而不是丢弃当前帧。\n"
-      "注意：此设置只有在'多线程渲染'开启时有效。",
+      "等待GPU完成前一帧的渲染, 而不是丢弃当前帧. \n"
+      "注意：此设置只有在'多线程渲染'开启时有效. ",
       {
          { "disabled", "禁用" },
          { "enabled",  "启用" },
@@ -648,14 +648,14 @@ struct retro_core_option_definition option_defs_chs[] = {
 #ifdef LOW_END
       "disabled",
 #else
-      "enabled",
+      "disabled",
 #endif
    },
    {
       CORE_OPTION_NAME "_delay_frame_swapping",
       "延迟帧交换",
-      "对避免闪屏和视频跳动很有用。不推荐在低速平台上开启。\n"
-      "注意：此设置只有在'多线程渲染'开启时有效。",
+      "对避免闪屏和视频跳动很有用. 不推荐在低速平台上开启. \n"
+      "注意：此设置只有在'多线程渲染'开启时有效. ",
       {
          { "disabled", "禁用" },
          { "enabled",  "启用" },
@@ -667,7 +667,7 @@ struct retro_core_option_definition option_defs_chs[] = {
    {
       CORE_OPTION_NAME "_frame_skipping",
       "跳帧",
-      "设置每个显示的帧之间跳过的帧数。",
+      "设置每个显示的帧之间跳过的帧数. ",
       {
          { "disabled",  "禁用" },
          { "1",         NULL },
@@ -683,7 +683,7 @@ struct retro_core_option_definition option_defs_chs[] = {
    {
       CORE_OPTION_NAME "_enable_purupuru",
       "振动包",
-      "启用控制器力反馈功能。",
+      "启用控制器力反馈功能. ",
       {
          { "disabled", "禁用" },
          { "enabled",  "启用" },
@@ -694,7 +694,7 @@ struct retro_core_option_definition option_defs_chs[] = {
    {
       CORE_OPTION_NAME "_allow_service_buttons",
       "允许NAOMI服务模式按钮",
-      "启用NAOMI基板的服务按钮，以进入框体设置菜单。",
+      "启用NAOMI基板的服务按钮, 以进入框体设置菜单. ",
       {
          { "disabled", "禁用" },
          { "enabled",  "启用" },
@@ -705,7 +705,7 @@ struct retro_core_option_definition option_defs_chs[] = {
    {
       CORE_OPTION_NAME "_enable_naomi_15khz_dipswitch",
       "启用NAOMI 15KHz DIP开关",
-      "此设置可以强制以240p, 480i模式显示或者完全无效，取决于游戏。",
+      "此设置可以强制以240p, 480i模式显示或者完全无效, 取决于游戏. ",
       {
          { "disabled", "禁用" },
          { "enabled",  "启用" },
@@ -738,9 +738,9 @@ struct retro_core_option_definition option_defs_chs[] = {
    {
       CORE_OPTION_NAME "_per_content_vmus",
       "分游戏VMU存档",
-      "如果禁用，所有游戏共享4个VMU存档文件 (A1, B1, C1, D1)，保存在RetroArch系统目录下。\n"
-       "'VMU A1'选项为每个游戏生成独立VMU 'A1'文件，保存在RetroArch存档目录下。\n"
-       "'所有VMU'选项为每个游戏生成4个独立的VMU文件 (A1, B1, C1, D1)。",
+      "如果禁用, 所有游戏共享4个VMU存档文件 (A1, B1, C1, D1), 保存在RetroArch系统目录下. \n"
+       "'VMU A1'选项为每个游戏生成独立VMU 'A1'文件, 保存在RetroArch存档目录下. \n"
+       "'所有VMU'选项为每个游戏生成4个独立的VMU文件 (A1, B1, C1, D1). ",
       {
          { "disabled", "禁用" },
          { "VMU A1",   NULL },
@@ -752,8 +752,8 @@ struct retro_core_option_definition option_defs_chs[] = {
    {
       CORE_OPTION_NAME "_show_vmu_screen_settings",
       "显示VMU显示设置",
-      "启用模拟VMU显示屏的可见性、大小和色彩的设置。\n"
-      "注意：必须切出快速菜单以使此设置生效。",
+      "启用模拟VMU显示屏的可见性、大小和色彩的设置. \n"
+      "注意：必须切出快速菜单以使此设置生效. ",
       {
          { "enabled",  "启用" },
          { "disabled", "禁用" },
@@ -768,8 +768,8 @@ struct retro_core_option_definition option_defs_chs[] = {
    {
       CORE_OPTION_NAME "_show_lightgun_settings",
       "显示光枪设置",
-      "启用光枪准心显示设置。\n"
-      "注意：必须切出快速菜单以使此设置生效。",
+      "启用光枪准心显示设置. \n"
+      "注意：必须切出快速菜单以使此设置生效. ",
       {
          { "enabled",  "启用" },
          { "disabled", "禁用" },
