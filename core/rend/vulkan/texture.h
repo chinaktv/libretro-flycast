@@ -173,16 +173,32 @@ public:
 		texture->format = vk::Format::eUndefined;
 	}
 
-protected:
-	virtual bool clearTexture(Texture *tex) override
-	{
-		std::for_each(inFlightTextures.begin(), inFlightTextures.end(),
-			[tex](std::unordered_set<Texture *>& set) { set.erase(tex); });
+	void Cleanup();
 
-		return BaseTextureCache<Texture>::clearTexture(tex);
+	void Clear()
+	{
+		BaseTextureCache::Clear();
+		for (auto& set : inFlightTextures)
+			set.clear();
+		for (auto& v : trashedImageViews)
+			v.clear();
+		for (auto& v : trashedImages)
+			v.clear();
+		for (auto& v : trashedMem)
+			v.clear();
+		for (auto& v : trashedBuffers)
+			v.clear();
 	}
 
 private:
+	bool clearTexture(Texture *tex)
+	{
+		for (auto& set : inFlightTextures)
+			set.erase(tex);
+
+		return tex->Delete();
+	}
+
 	template<typename T>
 	void EmptyTrash(T& v)
 	{

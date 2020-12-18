@@ -772,8 +772,6 @@ public:
 		return texture;
 	}
 
-	virtual ~BaseTextureCache() {}
-
 	void CollectCleanup()
 	{
 		std::vector<u64> list;
@@ -791,7 +789,7 @@ public:
 
 		for (u64 id : list)
 		{
-			if (clearTexture(&cache[id]))
+			if (cache[id].Delete())
 				cache.erase(id);
 		}
 	}
@@ -799,7 +797,7 @@ public:
 	void Clear()
 	{
 		for (auto& pair : cache)
-			clearTexture(&pair.second);
+			pair.second.Delete();
 
 		cache.clear();
 		KillTex = false;
@@ -807,11 +805,6 @@ public:
 	}
 
 protected:
-	virtual bool clearTexture(Texture *tex) {
-		return tex->Delete();
-	}
-
-private:
 	std::unordered_map<u64, Texture> cache;
 	// Only use TexU and TexV from TSP in the cache key
 	//     TexV : 7, TexU : 7
@@ -819,8 +812,6 @@ private:
 	//     TexAddr : 0x1FFFFF, Reserved : 0, StrideSel : 0, ScanOrder : 1, PixelFmt : 7, VQ_Comp : 1, MipMapped : 1
 	const TCW TCWTextureCacheMask = { { 0x1FFFFF, 0, 0, 1, 7, 1, 1 } };
 };
-
-void rend_text_invl(vram_block* bl);
 
 void ReadFramebuffer(PixelBuffer<u32>& pb, int& width, int& height);
 void WriteTextureToVRam(u32 width, u32 height, u8 *data, u16 *dst);
@@ -839,3 +830,10 @@ void dump_screenshot(u8 *buffer, u32 width, u32 height, bool alpha = false, u32 
 
 extern const std::array<f32, 16> D_Adjust_LoD_Bias;
 #undef clamp
+
+extern float fb_scale_x, fb_scale_y;
+static inline void rend_set_fb_scale(float x, float y)
+{
+	fb_scale_x = x;
+	fb_scale_y = y;
+}

@@ -22,11 +22,13 @@ u32 palette32_ram[1024];
 u32 pal_hash_256[4];
 u32 pal_hash_16[64];
 bool palette_updated;
+float fb_scale_x, fb_scale_y;
 
 // Rough approximation of LoD bias from D adjust param, only used to increase LoD
 const std::array<f32, 16> D_Adjust_LoD_Bias = {
 		0.f, -4.f, -2.f, -1.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f
 };
+static void rend_text_invl(vram_block* bl);
 
 u32 detwiddle[2][11][1024];
 //input : address in the yyyyyxxxxx format
@@ -221,7 +223,7 @@ bool VramLockedWriteOffset(size_t offset)
 		{
 			if (lock != nullptr)
 			{
-				libPvr_LockedBlockWrite(lock, (u32)offset);
+				rend_text_invl(lock);
 
 				if (lock != nullptr)
 				{
@@ -767,7 +769,20 @@ void ReadFramebuffer(PixelBuffer<u32>& pb, int& width, int& height)
 			break;
 	}
 
-	u32 addr = SPG_CONTROL.interlace && !SPG_STATUS.fieldnum ? FB_R_SOF2 : FB_R_SOF1;
+	u32 addr = FB_R_SOF1;
+	if (SPG_CONTROL.interlace)
+	{
+		if (width == modulus && FB_R_SOF2 == FB_R_SOF1 + width * bpp)
+		{
+			// Typical case alternating even and odd lines -> take the whole buffer at once
+			modulus = 0;
+			height *= 2;
+		}
+		else
+		{
+			addr = SPG_STATUS.fieldnum ? FB_R_SOF2 : FB_R_SOF1;
+		}
+	}
 
 	pb.init(width, height);
 	u8 *dst = (u8*)pb.data();
@@ -907,7 +922,7 @@ void WriteTextureToVRam(u32 width, u32 height, u8 *data, u16 *dst)
 	}
 }
 
-void rend_text_invl(vram_block* bl)
+static void rend_text_invl(vram_block* bl)
 {
 	BaseTextureCacheData* tcd = (BaseTextureCacheData*)bl->userdata;
 	tcd->dirty = FrameCount;

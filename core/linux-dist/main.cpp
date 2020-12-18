@@ -4,6 +4,7 @@
 #include "hw/sh4/dyna/blockmanager.h"
 #include "log/LogManager.h"
 #include "emulator.h"
+#include "rend/mainui.h"
 
 #include <cstdarg>
 #include <csignal>
@@ -30,12 +31,6 @@
 #if defined(USE_JOYSTICK)
     #include "cfg/cfg.h"
 	#include "joystick.h"
-#endif
-
-#ifdef TARGET_PANDORA
-	#include <signal.h>
-	#include <execinfo.h>
-	#include <sys/soundcard.h>
 #endif
 
 #if defined(USE_JOYSTICK)
@@ -73,18 +68,18 @@ void os_SetupInput()
 #endif
 }
 
-void UpdateInputState(u32 port)
+void UpdateInputState()
 {
 	#if defined(USE_JOYSTICK)
-		input_joystick_handle(joystick_fd, port);
+		input_joystick_handle(joystick_fd, 0);
 	#endif
 
 	#if defined(USE_EVDEV)
-		input_evdev_handle(port);
+		input_evdev_handle();
 	#endif
 
 	#if defined(USE_SDL)
-		input_sdl_handle(port);
+		input_sdl_handle();
 	#endif
 }
 
@@ -120,36 +115,6 @@ void os_CreateWindow()
 }
 
 void common_linux_setup();
-void* rend_thread(void* p);
-
-#ifdef TARGET_PANDORA
-	void clean_exit(int sig_num)
-	{
-		void* array[10];
-		size_t size;
-
-		if (joystick_fd >= 0) { close(joystick_fd); }
-		for (int port = 0; port < 4 ; port++)
-		{
-			if (evdev_controllers[port]->fd >= 0)
-			{
-				close(evdev_controllers[port]->fd);
-			}
-		}
-
-		x11_window_destroy();
-
-		// finish cleaning
-		if (sig_num!=0)
-		{
-			write(2, "\nSignal received\n", sizeof("\nSignal received\n"));
-
-			size = backtrace(array, 10);
-			backtrace_symbols_fd(array, size, STDERR_FILENO);
-			exit(1);
-		}
-	}
-#endif
 
 // Find the user config directory.
 // The following folders are checked in this order:
@@ -380,10 +345,6 @@ std::vector<std::string> find_system_data_dirs()
 int main(int argc, char* argv[])
 {
 	LogManager::Init();
-	#ifdef TARGET_PANDORA
-		signal(SIGSEGV, clean_exit);
-		signal(SIGKILL, clean_exit);
-	#endif
 
 	// Set directories
 	set_user_config_dir(find_user_config_dir());
@@ -395,13 +356,13 @@ int main(int argc, char* argv[])
 	INFO_LOG(BOOT, "Config dir is: %s", get_writable_config_path("").c_str());
 	INFO_LOG(BOOT, "Data dir is:   %s", get_writable_data_path("").c_str());
 
-	#if defined(USE_SDL)
-		// init video now: on rpi3 it installs a sigsegv handler(?)
-		if (SDL_Init(SDL_INIT_VIDEO) != 0)
-		{
-			die("SDL: Initialization failed!");
-		}
-	#endif
+#if defined(USE_SDL)
+	// init video now: on rpi3 it installs a sigsegv handler(?)
+	if (SDL_Init(SDL_INIT_VIDEO) != 0)
+	{
+		die("SDL: Initialization failed!");
+	}
+#endif
 
 	common_linux_setup();
 
@@ -410,21 +371,17 @@ int main(int argc, char* argv[])
 	if (reicast_init(argc, argv))
 		die("Reicast initialization failed\n");
 
-	rend_thread(NULL);
-
-	#ifdef TARGET_PANDORA
-		clean_exit(0);
-	#endif
+	mainui_loop();
 
 	dc_term();
 
-	#if defined(USE_EVDEV)
-		input_evdev_close();
-	#endif
+#if defined(USE_EVDEV)
+	input_evdev_close();
+#endif
 
-	#if defined(SUPPORT_X11)
-		x11_window_destroy();
-	#endif
+#if defined(SUPPORT_X11)
+	x11_window_destroy();
+#endif
 
 #if defined(USE_SDL)
 	sdl_window_destroy();
@@ -433,8 +390,6 @@ int main(int argc, char* argv[])
 	return 0;
 }
 #endif
-
-int get_mic_data(u8* buffer) { return 0; }
 
 void os_DebugBreak()
 {

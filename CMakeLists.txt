@@ -518,6 +518,7 @@ target_sources(${PROJECT_NAME} PRIVATE
         core/hw/maple/maple_helper.h
         core/hw/maple/maple_if.cpp
         core/hw/maple/maple_if.h
+        core/hw/maple/maple_jvs.cpp
         core/hw/mem/vmem32.cpp
         core/hw/mem/vmem32.h
         core/hw/mem/_vmem.cpp
@@ -771,6 +772,7 @@ target_sources(${PROJECT_NAME} PRIVATE
         core/rend/gui_android.h
         core/rend/gui_util.cpp
         core/rend/gui_util.h
+        core/rend/mainui.cpp
         core/rend/osd.cpp
         core/rend/osd.h
         core/rend/sorter.cpp

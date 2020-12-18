@@ -257,6 +257,8 @@ bool dc_unserialize(void **data, unsigned int *total_size);
 #define REICAST_SA(v_arr,num) rc_serialize((v_arr), sizeof((v_arr)[0])*(num), data, total_size)
 #define REICAST_USA(v_arr,num) rc_unserialize((v_arr), sizeof((v_arr)[0])*(num), data, total_size)
 
+#define REICAST_SKIP(size) do { if (*data) *(u8**)data += (size); *total_size += (size); } while (false)
+
 #ifndef _MSC_VER
 #define stricmp strcasecmp
 #endif
@@ -346,6 +348,13 @@ enum class JVS {
 	OutTrigger,
 	LightGunAsAnalog,
 	WaveRunnerGP,
+};
+
+enum class RenderType {
+	OpenGL = 0,
+	OpenGL_OIT = 3,
+	Vulkan = 4,
+	Vulkan_OIT = 5
 };
 
 struct settings_t
@@ -463,12 +472,12 @@ struct settings_t
 	struct
 	{
 		u32 ta_skip;
-		u32 rend;	// 0: GLES, GL3, 3: OIT/GL4.3, 4: Vulkan
+		RenderType rend;
 
 		u32 MaxThreads;
 		bool SynchronousRender;
 
-		bool IsOpenGL() { return rend == 0 || rend == 3; }
+		bool IsOpenGL() { return rend == RenderType::OpenGL || rend == RenderType::OpenGL_OIT; }
 	} pvr;
 
 	struct {
@@ -517,8 +526,6 @@ inline bool is_u16(u32 v) { return (u16)v==(u32)v; }
 s32 libPvr_Init();
 void libPvr_Reset(bool Manual);
 void libPvr_Term();
-
-void libPvr_LockedBlockWrite(vram_block* block,u32 addr);	//set to 0 if not used
 
 void* libPvr_GetRenderTarget();
 
@@ -625,4 +632,5 @@ enum serialize_version_enum {
 	V9 = 804,
 	V10 = 805,
 	V11 = 806,
+	V12 = 807,
 } ;

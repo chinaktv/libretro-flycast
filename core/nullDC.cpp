@@ -21,7 +21,6 @@
 #include "reios/reios.h"
 #include "hw/sh4/sh4_sched.h"
 #include "hw/sh4/sh4_if.h"
-#include "hw/pvr/Renderer_if.h"
 #include "hw/pvr/spg.h"
 #include "hw/aica/aica_if.h"
 #include "hw/aica/dsp.h"
@@ -35,6 +34,7 @@
 #include "rend/CustomTexture.h"
 #include "hw/maple/maple_devs.h"
 #include "network/naomi_network.h"
+#include "rend/mainui.h"
 
 void FlushCache();
 static void LoadCustom();
@@ -171,6 +171,13 @@ static void LoadSpecialSettings()
 			settings.rend.ExtraDepthScale = 100;
 			extra_depth_game = true;
 		}
+		// Samurai Shodown 6 dc port
+		else if (!strncmp("T0002M", prod_id, 6))
+		{
+			INFO_LOG(BOOT, "Enabling Extra depth scaling for game %s", prod_id);
+			settings.rend.ExtraDepthScale = 1e26;
+			extra_depth_game = true;
+		}
 		// Super Producers
 		if (!strncmp("T14303M", prod_id, 7)
 			// Giant Killers
@@ -196,7 +203,11 @@ static void LoadSpecialSettings()
 			// StarLancer (EU) (for online support)
 			|| !strncmp("T17723D 05", prod_id, 10)
 			// Heroes of might and magic III
-			|| !strncmp("T0000M", prod_id, 6))
+			|| !strncmp("T0000M", prod_id, 6)
+			// WebTV
+			|| !strncmp("6107117", prod_id, 7)
+			// PBA
+			|| !strncmp("T26702N", prod_id, 7))
 		{
 			INFO_LOG(BOOT, "Disabling 32-bit virtual memory for game %s", prod_id);
 			settings.dynarec.disable_vmem32 = true;
@@ -423,6 +434,7 @@ int reicast_init(int argc, char* argv[])
 		LogManager::Init();
 		LoadSettings(false);
 	}
+	settings.pvr.rend = (RenderType)cfgLoadInt("config", "pvr.rend", (int)settings.pvr.rend);
 
 	os_CreateWindow();
 	os_SetupInput();
@@ -701,7 +713,7 @@ void dc_request_reset()
 void dc_exit()
 {
 	dc_stop();
-	rend_stop_renderer();
+	mainui_stop();
 }
 
 void InitSettings()
@@ -746,7 +758,6 @@ void InitSettings()
 	settings.rend.WidescreenGameHacks = false;
 
 	settings.pvr.ta_skip			= 0;
-	settings.pvr.rend				= 0;
 
 	settings.pvr.MaxThreads		    = 3;
 	settings.pvr.SynchronousRender	= true;
@@ -847,9 +858,6 @@ void LoadSettings(bool game_specific)
 	settings.rend.WidescreenGameHacks = cfgLoadBool(config_section, "rend.WidescreenGameHacks", settings.rend.WidescreenGameHacks);
 
 	settings.pvr.ta_skip			= cfgLoadInt(config_section, "ta.skip", settings.pvr.ta_skip);
-	if (!game_specific)
-		// crashes if switching gl <-> vulkan
-		settings.pvr.rend				= cfgLoadInt(config_section, "pvr.rend", settings.pvr.rend);
 
 	settings.pvr.MaxThreads		    = cfgLoadInt(config_section, "pvr.MaxThreads", settings.pvr.MaxThreads);
 	settings.pvr.SynchronousRender	= cfgLoadBool(config_section, "pvr.SynchronousRendering", settings.pvr.SynchronousRender);
@@ -1003,7 +1011,7 @@ void SaveSettings()
 	if (!naomi_rotate_screen || !settings.rend.Rotate90)
 		cfgSaveBool("config", "rend.Rotate90", settings.rend.Rotate90);
 	cfgSaveInt("config", "ta.skip", settings.pvr.ta_skip);
-	cfgSaveInt("config", "pvr.rend", settings.pvr.rend);
+	cfgSaveInt("config", "pvr.rend", (int)settings.pvr.rend);
 	cfgSaveBool("config", "rend.PerStripSorting", settings.rend.PerStripSorting);
 	cfgSaveBool("config", "rend.DelayFrameSwapping", settings.rend.DelayFrameSwapping);
 	cfgSaveBool("config", "rend.WidescreenGameHacks", settings.rend.WidescreenGameHacks);
