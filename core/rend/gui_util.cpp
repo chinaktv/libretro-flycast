@@ -269,14 +269,14 @@ void select_directory_popup(const char *prompt, float scaling, StringCallback ca
         
 		ImGui::PopStyleVar();
 		ImGui::EndChild();
-		if (ImGui::Button("Select Current Directory", ImVec2(0, 30 * scaling)))
+		if (ImGui::Button("选择当前路径", ImVec2(0, 30 * scaling)))
 		{
 			subfolders_read = false;
 			callback(false, select_current_directory);
 			ImGui::CloseCurrentPopup();
 		}
 		ImGui::SameLine();
-		if (ImGui::Button("Cancel", ImVec2(0, 30 * scaling)))
+		if (ImGui::Button("取消", ImVec2(0, 30 * scaling)))
 		{
 			subfolders_read = false;
 			callback(true, "");
