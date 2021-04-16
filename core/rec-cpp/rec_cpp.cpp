@@ -1,8 +1,6 @@
 
 #include "types.h"
 
-#include <map>
-#include <algorithm>
 
 #include "hw/sh4/sh4_opcode_list.h"
 #include "hw/sh4/modules/ccn.h"
@@ -16,21 +14,44 @@
 #define SHIL_MODE 2
 #include "hw/sh4/dyna/shil_canonical.h"
 
-
 #define MIPS_COUNTER 0
 
-extern int mips_counter;
-extern int cycle_counter;
+#include <algorithm>
+#include <map>
 
-void ngen_blockcheckfail_CC(u32 pc) {
+struct DynaRBI : RuntimeBlockInfo
+{
+	virtual u32 Relink() {
+		//verify(false);
+		return 0;
+	}
+
+	virtual void Relocate(void* dst) {
+		verify(false);
+	}
+};
+
+extern int mips_counter;
+int cycle_counter;
+
+void ngen_init()
+{
+}
+
+void ngen_GetFeatures(ngen_features* dst)
+{
+	dst->InterpreterFallback = false;
+	dst->OnlyDynamicEnds = false;
+}
+
+RuntimeBlockInfo* ngen_AllocateBlock()
+{
+	return new DynaRBI();
+}
+
+void ngen_blockcheckfail(u32 pc) {
 	INFO_LOG(DYNAREC, "REC CPP: SMC invalidation at %08X", pc);
 	rdv_BlockCheckFail(pc);
-}
-int idxnxx = 0;
-
-void ngen_ResetBlocks_cpp(void)
-{
-	idxnxx = 0;
 }
 
 class opcodeExec {
@@ -50,7 +71,7 @@ struct CC_PS
 	shil_param* prm;
 };
 
-typedef vector<CC_PS> CC_pars_t;
+typedef std::vector<CC_PS> CC_pars_t;
 
 
 struct opcode_cc_aBaCbC {
@@ -1048,7 +1069,7 @@ struct opcode_blockend : public opcodeExec {
 template <int sz>
 struct opcode_check_block : public opcodeExec {
 	RuntimeBlockInfo* block;
-	vector<u8> code;
+   std::vector<u8> code;
 	const void* ptr;
 
 	opcodeExec* setup(RuntimeBlockInfo* block) {
@@ -1070,19 +1091,19 @@ struct opcode_check_block : public opcodeExec {
 		{
 		case 4:
 			if (*(u32 *)ptr != *(u32 *)&code[0])
-				ngen_blockcheckfail_CC(block->addr);
+				ngen_blockcheckfail(block->addr);
 			break;
 		case 6:
 			if (*(u32 *)ptr != *(u32 *)&code[0] || *((u16 *)ptr + 2) != *((u16 *)&code[0] + 2))
-				ngen_blockcheckfail_CC(block->addr);
+				ngen_blockcheckfail(block->addr);
 			break;
 		case 8:
 			if (*(u32 *)ptr != *(u32 *)&code[0] || *((u32 *)ptr + 1) != *((u32 *)&code[0] + 1))
-				ngen_blockcheckfail_CC(block->addr);
+				ngen_blockcheckfail(block->addr);
 			break;
 		default:
 			if (memcmp(ptr, &code[0], block->sh4_code_size) != 0)
-				ngen_blockcheckfail_CC(block->addr);
+				ngen_blockcheckfail(block->addr);
 			break;
 		}
 	}
@@ -1167,7 +1188,7 @@ opcodeExec* createType2(const CC_pars_t& prms, void* fun) {
 }
 
 
-map<void*, int> funs;
+std::map<void*, int> funs;
 
 
 int funs_id_count;
@@ -1184,7 +1205,7 @@ template <> \
 opcodeExec* createType_fast<OPCODE_CC(sig)>(const CC_pars_t& prms, void* fun, shil_opcode* opcode) { \
 	typedef OPCODE_CC(sig) CTR; \
 	\
-	static map<void*, opcodeExec* (*)(const CC_pars_t& prms, void* fun)> funsf = {\
+	static std::map<void*, opcodeExec* (*)(const CC_pars_t& prms, void* fun)> funsf = {\
 		
 #define FAST_gis \
 };\
@@ -1385,7 +1406,7 @@ FAST_gis
 
 typedef opcodeExec*(*foas)(const CC_pars_t& prms, void* fun, shil_opcode* opcode);
 
-string getCTN(foas code);
+std::string getCTN(foas code);
 
 template <typename CTR>
 opcodeExec* createType(const CC_pars_t& prms, void* fun, shil_opcode* opcode) {
@@ -1407,7 +1428,7 @@ opcodeExec* createType(const CC_pars_t& prms, void* fun, shil_opcode* opcode) {
 	return rv;
 }
 
-map< string, foas> unmap = {
+std::map< std::string, foas> unmap = {
 	{ "aBaCbC", &createType_fast<opcode_cc_aBaCbC> },
 	{ "aCaCbC", &createType<opcode_cc_aCaCbC> },
 	{ "aCaBbC", &createType<opcode_cc_aCaBbC> },
@@ -1442,8 +1463,8 @@ map< string, foas> unmap = {
 	{ "vV", &createType<opcode_cc_vV> },
 };
 
-string getCTN(foas f) {
-	auto it = find_if(unmap.begin(), unmap.end(), [f](const map< string, foas>::value_type& s) { return s.second == f; });
+std::string getCTN(foas f) {
+	auto it = find_if(unmap.begin(), unmap.end(), [f](const std::map< std::string, foas>::value_type& s) { return s.second == f; });
 
 	return it->first;
 }
@@ -1460,7 +1481,7 @@ void disaptchn() {
 	dispatchb[n].runner(dispatchb[n].fnb);
 }
 
-extern int idxnxx;
+int idxnxx = 0;
 //&disaptchn
 #define REP_1(x, phrase) phrase < x >
 #define REP_2(x, phrase) REP_1(x, phrase), REP_1(x+1, phrase)
@@ -1854,7 +1875,7 @@ public:
 
 	void ngen_CC_Finish(shil_opcode* op)
 	{
-		string nm = "";
+      std::string nm = "";
 		for (auto m : CC_pars) {
 			nm += (char)(m.type + 'a');
 			nm += (char)(m.prm->type + 'A');
@@ -1875,7 +1896,7 @@ public:
 
 BlockCompilercpp *compilercpp_data;
 
-void ngen_Compile_cpp(RuntimeBlockInfo* block, bool force_checks, bool reset, bool staging, bool optimise)
+void ngen_Compile(RuntimeBlockInfo* block, bool force_checks, bool reset, bool staging, bool optimise)
 {
 	verify(emit_FreeSpace() >= 16 * 1024);
 
@@ -1888,26 +1909,38 @@ void ngen_Compile_cpp(RuntimeBlockInfo* block, bool force_checks, bool reset, bo
 	delete compiler;
 }
 
-void ngen_CC_Call_cpp(shil_opcode*op, void* function)
-{
-   BlockCompilercpp *compiler = compilercpp_data;
-	compiler->ngen_CC_Call(op, function);
-}
-
-void ngen_CC_Finish_cpp(shil_opcode* op)
-{
-   BlockCompilercpp *compiler = compilercpp_data;
-	compiler->ngen_CC_Finish(op);
-}
-
-void ngen_CC_Start_cpp(shil_opcode* op)
+void ngen_CC_Start(shil_opcode* op)
 {
    BlockCompilercpp *compiler = compilercpp_data;
    compiler->ngen_CC_Start(op);
 }
 
-void ngen_CC_Param_cpp(shil_opcode* op,shil_param* par,CanonicalParamType tp)
+void ngen_CC_Param(shil_opcode* op,shil_param* par,CanonicalParamType tp)
 {
    BlockCompilercpp *compiler = compilercpp_data;
    compiler->ngen_CC_param(*op, *par, tp);
+}
+
+void ngen_CC_Call(shil_opcode*op, void* function)
+{
+   BlockCompilercpp *compiler = compilercpp_data;
+	compiler->ngen_CC_Call(op, function);
+}
+
+void ngen_CC_Finish(shil_opcode* op)
+{
+   BlockCompilercpp *compiler = compilercpp_data;
+	compiler->ngen_CC_Finish(op);
+}
+
+void ngen_ResetBlocks(void)
+{
+	idxnxx = 0;
+   /* FIXME issues when block check fails -> delete current block/op
+	for (int i = 0; i < CODE_ENTRY_COUNT && dispatchb[i].fnb != nullptr; i++)
+	{
+		delete dispatchb[i].fnb;
+		dispatchb[i].fnb = nullptr;
+	}
+	*/
 }

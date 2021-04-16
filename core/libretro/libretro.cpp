@@ -218,24 +218,24 @@ static void *emu_thread_func(void *)
     while ( true )
     {
     	performed_serialization = false ;
-    	mtx_mainloop.Lock() ;
-    	rend_cancel_emu_wait() ;
+    	mtx_mainloop.lock();
+    	rend_cancel_emu_wait();
         dc_run();
-        mtx_mainloop.Unlock() ;
+        mtx_mainloop.unlock();
 
-    	mtx_serialization.Lock() ;
-    	mtx_serialization.Unlock() ;
+    	mtx_serialization.lock();
+    	mtx_serialization.unlock();
 
     	if (!performed_serialization && !reset_requested)
     		break ;
     	if (reset_requested)
     	{
-    		dc_reset();
+    		dc_reset(false);
     		reset_requested = false;
     	}
     }
 
-	rend_cancel_emu_wait() ;
+	rend_cancel_emu_wait();
     dc_term();
 
     emu_in_thread = false ;
@@ -243,19 +243,6 @@ static void *emu_thread_func(void *)
     return NULL;
 }
 #endif
-
-
-void co_dc_yield(void)
-{
-#if !defined(TARGET_NO_THREADS)
-    if (!settings.rend.ThreadedRendering)
-#endif
-    {
-    	if (settings.UpdateMode || settings.UpdateModeForced)
-    		return;
-    	dc_stop();
-    }
-}
 
 void retro_set_video_refresh(retro_video_refresh_t cb)
 {
@@ -363,8 +350,8 @@ void retro_deinit(void)
 
    //When auto-save states are enabled this is needed to prevent the core from shutting down before
    //any save state actions are still running - which results in partial saves
-   mtx_serialization.Lock() ;
-   mtx_serialization.Unlock() ;
+   mtx_serialization.lock();
+   mtx_serialization.unlock();
 
    libretro_supports_bitmasks = false;
    LogManager::Shutdown();
@@ -959,7 +946,7 @@ static void update_variables(bool first_startup)
 	   if (!strcmp("disabled", var.value))
 		   settings.pvr.ta_skip = 0;
 	   else {
-		   settings.pvr.ta_skip = max(0, min(6, var.value[0] - '0'));
+		   settings.pvr.ta_skip = std::max(0, std::min(6, var.value[0] - '0'));
 	   }
    }
    else
@@ -1195,37 +1182,38 @@ static void update_variables(bool first_startup)
 
 void retro_run (void)
 {
-   bool fastforward = false;
    bool updated     = false;
-
-   if (environ_cb(RETRO_ENVIRONMENT_GET_FASTFORWARDING, &fastforward) && settings.rend.ThreadedRendering)
-      settings.aica.LimitFPS = !fastforward;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
       update_variables(false);
 
-   refresh_devices(false);
+   if (devices_need_refresh)
+      refresh_devices(false);
 
 #if !defined(TARGET_NO_THREADS)
    if (settings.rend.ThreadedRendering)
    {
-	   // On the first call, we start the emulator thread
-	   if (first_run)
-	   {
-		   emu_thread.Start();
-		   first_run = false;
-	   }
+      bool fastforward = false;
+      if (environ_cb(RETRO_ENVIRONMENT_GET_FASTFORWARDING, &fastforward))
+         settings.aica.LimitFPS = !fastforward;
 
-	   poll_cb();
+      // On the first call, we start the emulator thread
+      if (first_run)
+      {
+         emu_thread.Start();
+         first_run = false;
+      }
 
-	   if (settings.pvr.rend == 0 || settings.pvr.rend == 3)
-	   	glsm_ctl(GLSM_CTL_STATE_BIND, NULL);
+      poll_cb();
 
-	   // Render
-	   is_dupe = !rend_single_frame();
+      if (settings.pvr.rend == 0 || settings.pvr.rend == 3)
+         glsm_ctl(GLSM_CTL_STATE_BIND, NULL);
 
-	   if (settings.pvr.rend == 0 || settings.pvr.rend == 3)
-	   	glsm_ctl(GLSM_CTL_STATE_UNBIND, NULL);
+      // Render
+      is_dupe = !rend_single_frame();
+
+      if (settings.pvr.rend == 0 || settings.pvr.rend == 3)
+         glsm_ctl(GLSM_CTL_STATE_UNBIND, NULL);
    }
    else
 #endif
@@ -1244,31 +1232,30 @@ void retro_run (void)
 void retro_reset (void)
 {
 #if !defined(TARGET_NO_THREADS)
-   mtx_serialization.Lock();
+   mtx_serialization.lock();
    if (settings.rend.ThreadedRendering)
    {
 	  dc_stop();
 	  if (!acquire_mainloop_lock())
 	  {
 		 dc_start();
-		 mtx_serialization.Unlock();
+		 mtx_serialization.unlock();
 		 return;
 	  }
    }
 #endif
 
    settings.dreamcast.cable = 3;
-   settings.dreamcast.RTC = GetRTC_now();
    update_variables(false);
-   dc_reset();
+   dc_reset(true);
 
 #if !defined(TARGET_NO_THREADS)
    if (settings.rend.ThreadedRendering)
    {
 	  performed_serialization = true;
-	  mtx_mainloop.Unlock();
+	  mtx_mainloop.unlock();
    }
-   mtx_serialization.Unlock();
+   mtx_serialization.unlock();
 #endif
 }
 
@@ -2047,7 +2034,8 @@ bool retro_load_game(const struct retro_game_info *game)
    if (naomi_cart_GetRotation() == 3)
       rotation = rotate_screen ? 0 : 1;
    environ_cb(RETRO_ENVIRONMENT_SET_ROTATION, &rotation);
-   refresh_devices(true);
+   if (devices_need_refresh)
+      refresh_devices(true);
 
    return true;
 }
@@ -2112,7 +2100,7 @@ size_t retro_serialize_size (void)
 
 bool wait_until_dc_running()
 {
-	retro_time_t start_time = perf_cb.get_time_usec() ;
+	retro_time_t start_time = perf_cb.get_time_usec();
 	const retro_time_t FIVE_SECONDS = 5*1000000 ;
 	while(!dc_is_running())
 	{
@@ -2128,10 +2116,10 @@ bool wait_until_dc_running()
 bool acquire_mainloop_lock()
 {
 	bool result = false ;
-	retro_time_t start_time = perf_cb.get_time_usec() ;
+	retro_time_t start_time = perf_cb.get_time_usec();
 	const retro_time_t FIVE_SECONDS = 5*1000000 ;
 
-    while ( ( start_time+FIVE_SECONDS > perf_cb.get_time_usec() ) && !(result = mtx_mainloop.TryLock())  )
+    while ( ( start_time+FIVE_SECONDS > perf_cb.get_time_usec() ) && !(result = mtx_mainloop.trylock())  )
    	{
     	rend_cancel_emu_wait();
    	}
@@ -2146,19 +2134,20 @@ bool retro_serialize(void *data, size_t size)
    bool result = false ;
 
 #if !defined(TARGET_NO_THREADS)
-	mtx_serialization.Lock() ;
+	mtx_serialization.lock();
     if (settings.rend.ThreadedRendering)
     {
-    	if ( !wait_until_dc_running()) {
-        	mtx_serialization.Unlock() ;
+    	if ( !wait_until_dc_running())
+      {
+        	mtx_serialization.unlock();
         	return false ;
     	}
 
-  		dc_stop() ;
-  		if ( !acquire_mainloop_lock() )
+  		dc_stop();
+  		if ( !acquire_mainloop_lock())
   		{
-  			dc_start() ;
-        	mtx_serialization.Unlock() ;
+  			dc_start();
+        	mtx_serialization.unlock();
   			return false ;
   		}
     }
@@ -2170,9 +2159,9 @@ bool retro_serialize(void *data, size_t size)
 #if !defined(TARGET_NO_THREADS)
     if (settings.rend.ThreadedRendering)
     {
-    	mtx_mainloop.Unlock() ;
+    	mtx_mainloop.unlock();
     }
-	mtx_serialization.Unlock() ;
+	mtx_serialization.unlock();
 #endif
 
     return result ;
@@ -2188,16 +2177,16 @@ bool retro_unserialize(const void * data, size_t size)
 #if !defined(TARGET_NO_THREADS)
     if (settings.rend.ThreadedRendering)
     {
-    	mtx_serialization.Lock() ;
+    	mtx_serialization.lock();
     	if ( !wait_until_dc_running()) {
-        	mtx_serialization.Unlock() ;
+        	mtx_serialization.unlock();
         	return false ;
     	}
-  		dc_stop() ;
-  		if ( !acquire_mainloop_lock() )
+  		dc_stop();
+  		if ( !acquire_mainloop_lock())
   		{
-  			dc_start() ;
-        	mtx_serialization.Unlock() ;
+  			dc_start();
+        	mtx_serialization.unlock();
   			return false ;
   		}
     }
@@ -2231,8 +2220,8 @@ bool retro_unserialize(const void * data, size_t size)
 #if !defined(TARGET_NO_THREADS)
     if (settings.rend.ThreadedRendering)
     {
-    	mtx_mainloop.Unlock() ;
-    	mtx_serialization.Unlock() ;
+    	mtx_mainloop.unlock();
+    	mtx_serialization.unlock();
     }
 #endif
 
@@ -2368,31 +2357,28 @@ void retro_set_controller_port_device(unsigned in_port, unsigned device)
 
 static void refresh_devices(bool first_startup)
 {
-	if (devices_need_refresh)
-	{
-		devices_need_refresh = false;
-		set_input_descriptors();
+   devices_need_refresh = false;
+   set_input_descriptors();
 
-		if (!first_startup)
-		{
-			if (settings.System == DC_PLATFORM_DREAMCAST)
-				maple_ReconnectDevices();
+   if (!first_startup)
+   {
+      if (settings.System == DC_PLATFORM_DREAMCAST)
+         maple_ReconnectDevices();
 
-			if (rumble.set_rumble_state)
-			{
-				for(int i = 0; i < MAPLE_PORTS; i++)
-				{
-					rumble.set_rumble_state(i, RETRO_RUMBLE_STRONG, 0);
-					rumble.set_rumble_state(i, RETRO_RUMBLE_WEAK,   0);
-				}
-			}
-		}
-		else
-		{
-			mcfg_DestroyDevices();
-			mcfg_CreateDevices();
-		}
-	}
+      if (rumble.set_rumble_state)
+      {
+         for(int i = 0; i < MAPLE_PORTS; i++)
+         {
+            rumble.set_rumble_state(i, RETRO_RUMBLE_STRONG, 0);
+            rumble.set_rumble_state(i, RETRO_RUMBLE_WEAK,   0);
+         }
+      }
+   }
+   else
+   {
+      mcfg_DestroyDevices();
+      mcfg_CreateDevices();
+   }
 }
 
 // API version (to detect version mismatch)
@@ -2730,28 +2716,28 @@ static void UpdateInputStateNaomi(u32 port)
 			case 0:
 			   /* Left stick X: [-128, 127] */
 			   if (axis_type == Half)
-				  joyx[port] = max((int)joyx[port], 0) * 2;
+				  joyx[port] = std::max((int)joyx[port], 0) * 2;
 			   else
 				  joyx[port] += 128;
 			   break;
 			case 1:
 			   /* Left stick Y: [-128, 127] */
 			   if (axis_type == Half)
-				  joyy[port] = max((int)joyy[port], 0) * 2;
+				  joyy[port] = std::max((int)joyy[port], 0) * 2;
 			   else
 				  joyy[port] += 128;
 			   break;
 			case 2:
 			   /* Right stick X: [-128, 127] */
 			   if (axis_type == Half)
-				  joyrx[port] = max((int)joyrx[port], 0) * 2;
+				  joyrx[port] = std::max((int)joyrx[port], 0) * 2;
 			   else
 				  joyrx[port] += 128;
 			   break;
 			case 3:
 			   /* Right stick Y: [-128, 127] */
 			   if (axis_type == Half)
-				  joyry[port] = max((int)joyry[port], 0) * 2;
+				  joyry[port] = std::max((int)joyry[port], 0) * 2;
 			   else
 				  joyry[port] += 128;
 			   break;
@@ -3138,19 +3124,19 @@ void UpdateVibration(u32 port, u32 value, u32 max_duration)
 	  INC = 0;
    bool CNT = value & 1;
 
-   double pow = min((POW_POS + POW_NEG) / 7.0, 1.0);
+   double pow         = std::min((POW_POS + POW_NEG) / 7.0, 1.0);
    vib_strength[port] = pow;
 
    rumble.set_rumble_state(port, RETRO_RUMBLE_STRONG, (u16)(65535 * pow));
 
    if (FREQ > 0 && (!CNT || INC))
-	  vib_stop_time[port] = get_time_ms() + min((int)(1000 * (INC ? abs(INC) * max(POW_POS, POW_NEG) : 1) / FREQ), (int)max_duration);
+	  vib_stop_time[port] = get_time_ms() + std::min((int)(1000 * (INC ? abs(INC) * std::max(POW_POS, POW_NEG) : 1) / FREQ), (int)max_duration);
    else
 	  vib_stop_time[port] = get_time_ms() + max_duration;
    if (INC == 0 || pow == 0)
 	  vib_delta[port] = 0.0;
    else
-	  vib_delta[port] = FREQ / (1000.0 * INC * max(POW_POS, POW_NEG));
+	  vib_delta[port] = FREQ / (1000.0 * INC * std::max(POW_POS, POW_NEG));
 }
 
 extern u8 kb_shift; 		// shift keys pressed (bitmask)

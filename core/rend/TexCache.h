@@ -1,4 +1,5 @@
 #pragma once
+#include "oslib/oslib.h"
 #include "hw/pvr/Renderer_if.h"
 
 #include <algorithm>
@@ -120,7 +121,7 @@ public:
 
 void palette_update();
 
-#define clamp(minv,maxv,x) min(maxv,max(minv,x))
+#define clamp(minv, maxv, x) (x < minv ? minv : x > maxv ? maxv : x)
 
 // Unpack to 16-bit word
 
@@ -635,9 +636,12 @@ void texture_VQ(PixelBuffer<pixel_type>* pb,u8* p_in,u32 Width,u32 Height)
 #define texPAL4_VQ32 texture_VQ<convPAL4_TW<u32>, u32>
 #define texPAL8_VQ32 texture_VQ<convPAL8_TW<u32>, u32>
 
+class BaseTextureCacheData;
+
 bool VramLockedWriteOffset(size_t offset);
+void libCore_vramlock_Lock(u32 start_offset, u32 end_offset, BaseTextureCacheData *texture);
+
 #ifdef HAVE_TEXUPSCALE
-void DePosterize(u32* source, u32* dest, int width, int height);
 void UpscalexBRZ(int factor, u32* source, u32* dest, int width, int height, bool has_alpha);
 #endif
 
@@ -778,6 +782,8 @@ public:
 		return texture;
 	}
 
+   virtual ~BaseTextureCache() {}
+
 	void CollectCleanup()
 	{
 		std::vector<u64> list;
@@ -810,7 +816,7 @@ public:
 		INFO_LOG(RENDERER, "Texture cache cleared");
 	}
 
-private:
+protected:
 	std::unordered_map<u64, Texture> cache;
 	// Only use TexU and TexV from TSP in the cache key
 	//     TexV : 7, TexU : 7
@@ -818,8 +824,6 @@ private:
 	//     TexAddr : 0x1FFFFF, Reserved : 0, StrideSel : 0, ScanOrder : 1, PixelFmt : 7, VQ_Comp : 1, MipMapped : 1
 	const TCW TCWTextureCacheMask = { { 0x1FFFFF, 0, 0, 1, 7, 1, 1 } };
 };
-
-void rend_text_invl(vram_block* bl);
 
 void ReadFramebuffer(PixelBuffer<u32>& pb, int& width, int& height);
 void WriteTextureToVRam(u32 width, u32 height, u8 *data, u16 *dst);

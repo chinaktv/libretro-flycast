@@ -115,7 +115,7 @@ public:
 
 	void Zero()
 	{
-		memset(data,0,sizeof(T)*Size);
+      memset(data,0,sizeof(T)*Size);
 	}
 
 	void Free()
@@ -214,13 +214,13 @@ public :
 		slock_free(mutx);
 #endif
 	}
-	void Lock()
+	void lock()
 	{
 #ifndef TARGET_NO_THREADS
 		slock_lock(mutx);
 #endif
 	}
-	bool TryLock()
+	bool trylock()
 	{
 #ifndef TARGET_NO_THREADS
 		return slock_try_lock(mutx);
@@ -228,34 +228,31 @@ public :
 		return false;
 #endif
 	}
-	void Unlock()
+	void unlock()
 	{
 #ifndef TARGET_NO_THREADS
 		slock_unlock(mutx);
 #endif
 	}
-	// std::BasicLockable so we can use std::lock_guard
-	void lock() { Lock(); }
-	void unlock() { Unlock(); }
 };
 
 //Set the path !
-void set_user_config_dir(const string& dir);
-void set_user_data_dir(const string& dir);
-void add_system_config_dir(const string& dir);
-void add_system_data_dir(const string& dir);
+void set_user_config_dir(const std::string& dir);
+void set_user_data_dir(const std::string& dir);
+void add_system_config_dir(const std::string& dir);
+void add_system_data_dir(const std::string& dir);
 
 //subpath format: /data/fsca-table.bit
-string get_writable_data_path(const string& filename);
-string get_writable_vmu_path(const char *logical_port);
+std::string get_writable_data_path(const std::string& filename);
+std::string get_writable_vmu_path(const char *logical_port);
 
-bool mem_region_lock(void *start, size_t len);
-bool mem_region_unlock(void *start, size_t len);
-bool mem_region_set_exec(void *start, size_t len);
-void *mem_region_reserve(void *start, size_t len);
-bool mem_region_release(void *start, size_t len);
-void *mem_region_map_file(void *file_handle, void *dest, size_t len, size_t offset, bool readwrite);
-bool mem_region_unmap_file(void *start, size_t len);
+bool mem_region_lock(void *start, std::size_t len);
+bool mem_region_unlock(void *start, std::size_t len);
+bool mem_region_set_exec(void *start, std::size_t len);
+void *mem_region_reserve(void *start, std::size_t len);
+bool mem_region_release(void *start, std::size_t len);
+void *mem_region_map_file(void *file_handle, void *dest, std::size_t len, std::size_t offset, bool readwrite);
+bool mem_region_unmap_file(void *start, std::size_t len);
 
 class VArray2
 {
@@ -346,3 +343,13 @@ int msgboxf(const char* text,unsigned int type,...);
 #define MBX_RV_IGNORE            5
 #define MBX_RV_YES               6
 #define MBX_RV_NO                7
+
+static inline std::string trim_trailing_ws(const std::string& str,
+                 const std::string& whitespace = " ")
+{
+    const auto strEnd = str.find_last_not_of(whitespace);
+	if (strEnd == std::string::npos)
+		return "";
+
+    return str.substr(0, strEnd + 1);
+}

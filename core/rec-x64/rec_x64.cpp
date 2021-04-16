@@ -31,18 +31,9 @@ struct DynaRBI : RuntimeBlockInfo
    }
 };
 
-extern int cycle_counter;
-
 extern "C" {
-
-void ngen_FailedToFindBlock_internal(void)
-{
-	rdv_FailedToFindBlock(Sh4cntx.pc);
+   int cycle_counter;
 }
-
-};
-
-void(*ngen_FailedToFindBlock)() = &ngen_FailedToFindBlock_internal;
 
 #ifdef __MACH__
 #define _U "_"
@@ -169,6 +160,20 @@ WIN32_ONLY(     ".seh_pushreg %r14                              \n\t")
 #undef _U
 #undef _S
 
+void ngen_init()
+{
+}
+
+void ngen_ResetBlocks()
+{
+}
+
+void ngen_GetFeatures(ngen_features* dst)
+{
+	dst->InterpreterFallback = false;
+	dst->OnlyDynamicEnds = false;
+}
+
 RuntimeBlockInfo* ngen_AllocateBlock(void)
 {
    return new DynaRBI();
@@ -252,12 +257,12 @@ static void do_sqw_nommu_local(u32 addr, u8* sqb)
 	do_sqw_nommu(addr, sqb);
 }
 
-class BlockCompilerx64 : public Xbyak::CodeGenerator
+class BlockCompiler : public Xbyak::CodeGenerator
 {
 public:
-	BlockCompilerx64() : BlockCompilerx64((u8 *)emit_GetCCPtr()) {}
+	BlockCompiler() : BlockCompiler((u8 *)emit_GetCCPtr()) {}
 
-	BlockCompilerx64(u8 *code_ptr) : Xbyak::CodeGenerator(emit_FreeSpace(), code_ptr), regalloc(this)
+	BlockCompiler(u8 *code_ptr) : Xbyak::CodeGenerator(emit_FreeSpace(), code_ptr), regalloc(this)
 	{
 #ifdef _WIN32
       call_regs.push_back(ecx);
@@ -519,19 +524,19 @@ public:
               break;
 
             case shop_and:
-               GenBinaryOp(op, &BlockCompilerx64::and_);
+               GenBinaryOp(op, &BlockCompiler::and_);
                break;
             case shop_or:
-               GenBinaryOp(op, &BlockCompilerx64::or_);
+               GenBinaryOp(op, &BlockCompiler::or_);
                break;
             case shop_xor:
-               GenBinaryOp(op, &BlockCompilerx64::xor_);
+               GenBinaryOp(op, &BlockCompiler::xor_);
                break;
             case shop_add:
-               GenBinaryOp(op, &BlockCompilerx64::add);
+               GenBinaryOp(op, &BlockCompiler::add);
                break;
             case shop_sub:
-               GenBinaryOp(op, &BlockCompilerx64::sub);
+               GenBinaryOp(op, &BlockCompiler::sub);
                break;
 
 #define SHIFT_OP(natop) \
@@ -920,16 +925,16 @@ public:
                //
 
             case shop_fadd:
-               GenBinaryFOp(op, &BlockCompilerx64::addss);
+               GenBinaryFOp(op, &BlockCompiler::addss);
                break;
             case shop_fsub:
-               GenBinaryFOp(op, &BlockCompilerx64::subss);
+               GenBinaryFOp(op, &BlockCompiler::subss);
                break;
             case shop_fmul:
-               GenBinaryFOp(op, &BlockCompilerx64::mulss);
+               GenBinaryFOp(op, &BlockCompiler::mulss);
                break;
             case shop_fdiv:
-               GenBinaryFOp(op, &BlockCompilerx64::divss);
+               GenBinaryFOp(op, &BlockCompiler::divss);
                break;
 
             case shop_fabs:
@@ -1025,6 +1030,7 @@ public:
 #endif
                break;
 
+/*
             case shop_fipr:
 					{
 						// Using doubles for better precision
@@ -1101,7 +1107,7 @@ public:
             		movaps(xword[rax], xmm0);
             	}
                break;
-
+*/
             case shop_frswap:
                mov(rax, (uintptr_t)op.rs1.reg_ptr());
                mov(rcx, (uintptr_t)op.rd.reg_ptr());
@@ -1453,8 +1459,8 @@ public:
 	}
 
 private:
-	typedef void (BlockCompilerx64::*X64BinaryOp)(const Xbyak::Operand&, const Xbyak::Operand&);
-	typedef void (BlockCompilerx64::*X64BinaryFOp)(const Xbyak::Xmm&, const Xbyak::Operand&);
+	typedef void (BlockCompiler::*X64BinaryOp)(const Xbyak::Operand&, const Xbyak::Operand&);
+	typedef void (BlockCompiler::*X64BinaryFOp)(const Xbyak::Xmm&, const Xbyak::Operand&);
 
 	bool GenReadMemImmediate(const shil_opcode& op, RuntimeBlockInfo* block)
 	{
@@ -1462,7 +1468,7 @@ private:
 			return false;
 		u32 size = op.flags & 0x7f;
 		u32 addr = op.rs1._imm;
-		if (mmu_enabled())
+      if (mmu_enabled() && mmu_is_translated<MMU_TT_DREAD>(addr, size))
 		{
 			if ((addr >> 12) != (block->vaddr >> 12))
 				// When full mmu is on, only consider addresses in the same 4k page
@@ -1484,7 +1490,7 @@ private:
 				break;
 			default:
 				die("Invalid immediate size");
-				break;
+            return false;
 			}
 			if (rv != MMU_ERROR_NONE)
 				return false;
@@ -1554,7 +1560,7 @@ private:
 
 			default:
 				die("Invalid immediate size");
-					break;
+            break;
 			}
 		}
 		else
@@ -1597,7 +1603,7 @@ private:
 
 			default:
 				die("Invalid immediate size");
-					break;
+            break;
 			}
 			host_reg_to_shil_param(op.rd, eax);
 		}
@@ -1612,7 +1618,7 @@ private:
 			return false;
 		u32 size = op.flags & 0x7f;
 		u32 addr = op.rs1._imm;
-		if (mmu_enabled())
+      if (mmu_enabled() && mmu_is_translated<MMU_TT_DWRITE>(addr, size))
 		{
 			if ((addr >> 12) != (block->vaddr >> 12))
 				// When full mmu is on, only consider addresses in the same 4k page
@@ -1634,7 +1640,7 @@ private:
 				break;
 			default:
 				die("Invalid immediate size");
-				break;
+            return false;
 			}
 			if (rv != MMU_ERROR_NONE)
 				return false;
@@ -1938,10 +1944,10 @@ private:
 	void GenCall(Ret(*function)(Params...), bool skip_floats = false)
 	{
 #ifndef _WIN32
-		bool xmm8_mapped = !skip_floats && current_opid != -1 && regalloc.IsMapped(xmm8, current_opid);
-		bool xmm9_mapped = !skip_floats && current_opid != -1 && regalloc.IsMapped(xmm9, current_opid);
-		bool xmm10_mapped = !skip_floats && current_opid != -1 && regalloc.IsMapped(xmm10, current_opid);
-		bool xmm11_mapped = !skip_floats && current_opid != -1 && regalloc.IsMapped(xmm11, current_opid);
+		bool xmm8_mapped = !skip_floats && current_opid != (size_t)-1 && regalloc.IsMapped(xmm8, current_opid);
+		bool xmm9_mapped = !skip_floats && current_opid != (size_t)-1 && regalloc.IsMapped(xmm9, current_opid);
+		bool xmm10_mapped = !skip_floats && current_opid != (size_t)-1 && regalloc.IsMapped(xmm10, current_opid);
+		bool xmm11_mapped = !skip_floats && current_opid != (size_t)-1 && regalloc.IsMapped(xmm11, current_opid);
 
 		// Need to save xmm registers as they are not preserved in linux/mach
 		int offset = 0;
@@ -2091,16 +2097,16 @@ private:
 		}
 	}
 
-	vector<Xbyak::Reg32> call_regs;
-	vector<Xbyak::Reg64> call_regs64;
-	vector<Xbyak::Xmm> call_regsxmm;
+   std::vector<Xbyak::Reg32> call_regs;
+   std::vector<Xbyak::Reg64> call_regs64;
+   std::vector<Xbyak::Xmm> call_regsxmm;
 
 	struct CC_PS
 	{
 	   CanonicalParamType type;
 	   const shil_param* prm;
 	};
-	vector<CC_PS> CC_pars;
+   std::vector<CC_PS> CC_pars;
 
 	X64RegAlloc regalloc;
 	Xbyak::util::Cpu cpu;
@@ -2112,9 +2118,9 @@ public:
 	static u32 mem_access_offset;
 };
 
-const u32 BlockCompilerx64::read_mem_op_size = 30;
-const u32 BlockCompilerx64::write_mem_op_size = 30;
-u32 BlockCompilerx64::mem_access_offset = 0;
+const u32 BlockCompiler::read_mem_op_size = 30;
+const u32 BlockCompiler::write_mem_op_size = 30;
+u32 BlockCompiler::mem_access_offset = 0;
 
 void X64RegAlloc::Preload(u32 reg, Xbyak::Operand::Code nreg)
 {
@@ -2133,42 +2139,37 @@ void X64RegAlloc::Writeback_FPU(u32 reg, s8 nreg)
    compiler->RegWriteback_FPU(reg, nreg);
 }
 
-static BlockCompilerx64* compilerx64_data;
+static BlockCompiler* compiler;
 
-void ngen_Compile_x64(RuntimeBlockInfo* block, bool force_checks, bool reset, bool staging, bool optimise)
+void ngen_Compile(RuntimeBlockInfo* block, bool force_checks, bool reset, bool staging, bool optimise)
 {
 	verify(CPU_RUNNING == offsetof(Sh4RCB, cntx.CpuRunning));
 	verify(PC == offsetof(Sh4RCB, cntx.pc));
 	verify(emit_FreeSpace() >= 16 * 1024);
 
-	compilerx64_data = new BlockCompilerx64();
+	compiler = new BlockCompiler();
 
-	BlockCompilerx64 *compiler = compilerx64_data;
-	
 	compiler->compile(block, force_checks, reset, staging, optimise);
 
 	delete compiler;
 }
 
-void ngen_CC_Call_x64(shil_opcode*op, void* function)
+void ngen_CC_Call(shil_opcode*op, void* function)
 {
-   BlockCompilerx64 *compiler = compilerx64_data;
    compiler->ngen_CC_Call(*op, function);
 }
 
-void ngen_CC_Param_x64(shil_opcode* op,shil_param* par,CanonicalParamType tp)
+void ngen_CC_Param(shil_opcode* op,shil_param* par,CanonicalParamType tp)
 {
-   BlockCompilerx64 *compiler = compilerx64_data;
    compiler->ngen_CC_param(*op, *par, tp);
 }
 
-void ngen_CC_Start_x64(shil_opcode* op)
+void ngen_CC_Start(shil_opcode* op)
 {
-   BlockCompilerx64 *compiler = compilerx64_data;
    compiler->ngen_CC_Start(*op);
 }
 
-void ngen_CC_Finish_x64(shil_opcode* op)
+void ngen_CC_Finish(shil_opcode* op)
 {
 }
 
@@ -2195,7 +2196,7 @@ bool ngen_Rewrite(unat& host_pc, unat, unat)
 	verify(opid < block->oplist.size());
 	const shil_opcode& op = block->oplist[opid];
 
-	BlockCompilerx64 *assembler = new BlockCompilerx64(code_ptr - BlockCompilerx64::mem_access_offset);
+	BlockCompiler *assembler = new BlockCompiler(code_ptr - BlockCompiler::mem_access_offset);
 	assembler->InitializeRewrite(block.get(), opid);
 	if (op.op == shop_readm)
 		assembler->GenReadMemorySlow(op, block.get());
@@ -2205,7 +2206,7 @@ bool ngen_Rewrite(unat& host_pc, unat, unat)
 	verify(block->host_code_size >= assembler->getSize());
 	delete assembler;
 	block->memory_accesses.erase(it);
-	host_pc = (unat)(code_ptr - BlockCompilerx64::mem_access_offset);
+	host_pc = (unat)(code_ptr - BlockCompiler::mem_access_offset);
 
 	return true;
 }

@@ -279,12 +279,11 @@ extern "C" void ngen_LinkBlock_cond_Branch_stub();
 extern "C" void ngen_LinkBlock_cond_Next_stub();
 
 extern "C" void ngen_FailedToFindBlock_();
-void (*ngen_FailedToFindBlock)()=&ngen_FailedToFindBlock_;  // in asm
 
 #include <map>
 
-map<shilop,ConditionCode> ccmap;
-map<shilop,ConditionCode> ccnmap;
+std::map<shilop,ConditionCode> ccmap;
+std::map<shilop,ConditionCode> ccnmap;
 
 u32 DynaRBI::Relink()
 {
@@ -569,14 +568,14 @@ struct CC_PS
 	CanonicalParamType type;
 	shil_param* par;
 };
-vector<CC_PS> CC_pars;
+std::vector<CC_PS> CC_pars;
 
-void ngen_CC_Start_arm(shil_opcode* op) 
+void ngen_CC_Start(shil_opcode* op) 
 { 
 	CC_pars.clear();
 }
 
-void ngen_CC_Param_arm(shil_opcode* op,shil_param* par,CanonicalParamType tp) 
+void ngen_CC_Param(shil_opcode* op,shil_param* par,CanonicalParamType tp) 
 { 
 	switch(tp)
 	{
@@ -637,7 +636,7 @@ void ngen_CC_Param_arm(shil_opcode* op,shil_param* par,CanonicalParamType tp)
 	}
 }
 
-void ngen_CC_Call_arm(shil_opcode* op,void* function) 
+void ngen_CC_Call(shil_opcode* op,void* function) 
 {
 	u32 rd=r0;
 	u32 fd=f0;
@@ -699,7 +698,7 @@ void ngen_CC_Call_arm(shil_opcode* op,void* function)
 	CALL((u32)function);
 }
 
-void ngen_CC_Finish_arm(shil_opcode* op) 
+void ngen_CC_Finish(shil_opcode* op) 
 { 
 	CC_pars.clear(); 
 }
@@ -1164,7 +1163,7 @@ bool ngen_writemem_immediate(RuntimeBlockInfo* block, shil_opcode* op, bool stag
 
 	mem_op_type optp = memop_type(op);
 	bool isram = false;
-	void* ptr = _vmem_write_const(op->rs1._imm, isram, max(4u, memop_bytes(optp)));
+	void* ptr = _vmem_write_const(op->rs1._imm, isram, std::max(4u, memop_bytes(optp)));
 
 	eReg rs2 = r1;
 	eFSReg rs2f = f0;
@@ -2206,7 +2205,7 @@ __default:
 }
 
 
-void ngen_Compile_arm(RuntimeBlockInfo* block,bool force_checks, bool reset, bool staging,bool optimise)
+void ngen_Compile(RuntimeBlockInfo* block,bool force_checks, bool reset, bool staging,bool optimise)
 {
 	//printf("Compile: %08X, %d, %d\n",block->addr,staging,optimise);
 	block->code=(DynarecCodeEntryPtr)EMIT_GET_PTR();
@@ -2367,6 +2366,9 @@ void ngen_Compile_arm(RuntimeBlockInfo* block,bool force_checks, bool reset, boo
 	block->host_code_size=(pEnd-(u8*)block->code);
 }
 
+void ngen_ResetBlocks()
+{
+}
 /*
 	SHR ..
 	CMP ..
@@ -2375,11 +2377,13 @@ void ngen_Compile_arm(RuntimeBlockInfo* block,bool force_checks, bool reset, boo
 	add
 	str
 */
-void ngen_init_arm(void)
+void ngen_init(void)
 {
-	INFO_LOG(DYNAREC, "Initializing the ARM32 dynarec");
-    verify(FPCB_OFFSET == -0x2100000 || FPCB_OFFSET == -0x4100000);
-    verify(rcb_noffs(p_sh4rcb->fpcb) == FPCB_OFFSET);
+   INFO_LOG(DYNAREC, "Initializing the ARM32 dynarec");
+   verify(FPCB_OFFSET == -0x2100000 || FPCB_OFFSET == -0x4100000);
+   verify(rcb_noffs(p_sh4rcb->fpcb) == FPCB_OFFSET);
+
+   ngen_FailedToFindBlock = &ngen_FailedToFindBlock_;
     
 	for (int s=0;s<6;s++)
 	{
@@ -2473,9 +2477,14 @@ void ngen_init_arm(void)
 
 }
 
+void ngen_GetFeatures(ngen_features* dst)
+{
+	dst->InterpreterFallback = false;
+	dst->OnlyDynamicEnds     = false;
+}
+
 RuntimeBlockInfo* ngen_AllocateBlock()
 {
 	return new DynaRBI();
 };
-
 #endif

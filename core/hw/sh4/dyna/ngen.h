@@ -76,7 +76,7 @@ void emit_SetBaseAddr();
 DynarecCodeEntryPtr DYNACALL rdv_FailedToFindBlock(u32 pc);
 DynarecCodeEntryPtr DYNACALL rdv_FailedToFindBlock_pc();
 //Called when a block check failed, and the block needs to be invalidated
-DynarecCodeEntryPtr DYNACALL rdv_BlockCheckFail(u32 pc);
+DynarecCodeEntryPtr DYNACALL rdv_BlockCheckFail(u32 addr);
 //Called to compile code @pc
 DynarecCodeEntryPtr rdv_CompilePC(u32 blockcheck_failures);
 //Finds or compiles code @pc
@@ -93,10 +93,10 @@ u32 DYNACALL rdv_DoInterrupts_pc(u32 pc);
 void ngen_init();
 
 //Called to compile a block
-extern void (*ngen_Compile)(RuntimeBlockInfo* block,bool force_checks, bool reset, bool staging,bool optimise);
+void ngen_Compile(RuntimeBlockInfo* block,bool force_checks, bool reset, bool staging,bool optimise);
 
 //Called when blocks are reseted
-extern void (*ngen_ResetBlocks)();
+void ngen_ResetBlocks(void);
 //Value to be returned when the block manager failed to find a block,
 //should call rdv_FailedToFindBlock and then jump to the return value
 extern void (*ngen_FailedToFindBlock)();
@@ -119,10 +119,10 @@ enum CanonicalParamType
 	CPT_ptr
 };
 
-extern void (*ngen_CC_Start)(shil_opcode* op);
-extern void (*ngen_CC_Param)(shil_opcode* op,shil_param* par,CanonicalParamType tp);
-extern void (*ngen_CC_Call)(shil_opcode* op,void* function);
-extern void (*ngen_CC_Finish)(shil_opcode* op);
+void ngen_CC_Start(shil_opcode* op);
+void ngen_CC_Param(shil_opcode* op,shil_param* par,CanonicalParamType tp);
+void ngen_CC_Call(shil_opcode* op,void* function);
+void ngen_CC_Finish(shil_opcode* op);
 
 RuntimeBlockInfo* ngen_AllocateBlock();
 

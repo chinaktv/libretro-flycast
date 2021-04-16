@@ -1,5 +1,6 @@
-#include "ta.h"
 #include "ta_ctx.h"
+#include "spg.h"
+#include "oslib/oslib.h"
 
 #include "hw/sh4/sh4_sched.h"
 
@@ -84,7 +85,7 @@ bool TryDecodeTARC(void)
 		vd_ctx->rend.proc_start = vd_ctx->rend.proc_end + 32;
 		vd_ctx->rend.proc_end = vd_ctx->tad.thd_data;
 			
-      vd_ctx->rend_inuse.Lock();
+      vd_ctx->rend_inuse.lock();
 		vd_rc = vd_ctx->rend;
 
 		//signal the vdec thread
@@ -100,7 +101,7 @@ void VDecEnd(void)
 
 	vd_ctx->rend = vd_rc;
 
-   vd_ctx->rend_inuse.Unlock();
+   vd_ctx->rend_inuse.unlock();
 
 	vd_ctx = 0;
 }
@@ -108,9 +109,6 @@ void VDecEnd(void)
 cMutex mtx_rqueue;
 TA_context* rqueue;
 cResetEvent frame_finished;
-
-double last_frame = 0;
-u64 last_cycles = 0;
 
 bool QueueRender(TA_context* ctx)
 {
@@ -123,23 +121,32 @@ bool QueueRender(TA_context* ctx)
 		return false;
  	}
 
-	//Try to limit speed to a "sane" level
-	//Speed is also limited via audio, but audio
-	//is sometimes not accurate enough (android, vista+)
-	u32 cycle_span = (u32)(sh4_sched_now64() - last_cycles);
-	last_cycles = sh4_sched_now64();
-	double time_span = os_GetSeconds() - last_frame;
-	last_frame = os_GetSeconds();
+   if (settings.pvr.SynchronousRendering)
+   {
+      //Try to limit speed to a "sane" level
+      //Speed is also limited via audio, but audio
+      //is sometimes not accurate enough (android, vista+)
+      static double last_frame = 0;
+      static u64 last_cycles   = 0;
+      u64 sched_now            = sh4_sched_now64();
+      u32 cycle_span           = (u32)(sched_now - last_cycles);
+      last_cycles              = sched_now;
+      double time_in_secs      = os_GetSeconds();
+      double time_span         = time_in_secs - last_frame;
+      last_frame               = time_in_secs;
+      bool too_fast            = (cycle_span / time_span) > SH4_MAIN_CLOCK;
 
-	bool too_fast = (cycle_span / time_span) > SH4_MAIN_CLOCK;
+      // Vulkan: RTT frames seem to be discarded often
+      if (rqueue && (too_fast || ctx->rend.isRTT))
+      {
+         //wait for a frame if
+         //  we have another one queue'd and
+         //  sh4 run at > 120% on the last slice
+         //  and SynchronousRendering is enabled
+         frame_finished.Wait();
+      }
+   }
 
-	if (rqueue && too_fast && settings.pvr.SynchronousRendering) {
-		//wait for a frame if
-		//  we have another one queue'd and
-		//  sh4 run at > 120% on the last slice
-		//  and SynchronousRendering is enabled
-		frame_finished.Wait();
-	}
 
 	if (rqueue)
    {
@@ -148,10 +155,10 @@ bool QueueRender(TA_context* ctx)
 	}
 
    frame_finished.Reset();
-   mtx_rqueue.Lock();
+   mtx_rqueue.lock();
 	TA_context* old = rqueue;
 	rqueue=ctx;
-   mtx_rqueue.Unlock();
+   mtx_rqueue.unlock();
 
    verify(!old);
 
@@ -160,9 +167,9 @@ bool QueueRender(TA_context* ctx)
 
 TA_context* DequeueRender(void)
 {
-   mtx_rqueue.Lock();
+   mtx_rqueue.lock();
 	TA_context* rv = rqueue;
-   mtx_rqueue.Unlock();
+   mtx_rqueue.unlock();
 
 	if (rv)
 		FrameCount++;
@@ -172,9 +179,9 @@ TA_context* DequeueRender(void)
 
 bool rend_framePending(void)
 {
-   mtx_rqueue.Lock();
+   mtx_rqueue.lock();
 	TA_context* rv = rqueue;
-   mtx_rqueue.Unlock();
+   mtx_rqueue.unlock();
 
 	return rv != 0;
 }
@@ -184,32 +191,32 @@ void FinishRender(TA_context* ctx)
 	if (ctx != NULL)
 	{
 		verify(rqueue == ctx);
-		mtx_rqueue.Lock();
+		mtx_rqueue.lock();
 		rqueue = NULL;
-		mtx_rqueue.Unlock();
+		mtx_rqueue.unlock();
 
 		tactx_Recycle(ctx);
 	}
 	frame_finished.Set();
 }
 
-cMutex mtx_pool;
+static cMutex mtx_pool;
 
 /* texture cache entry pool. */
-vector<TA_context*> ctx_pool;
-vector<TA_context*> ctx_list;
+static std::vector<TA_context*> ctx_pool;
+static std::vector<TA_context*> ctx_list;
 
 TA_context* tactx_Alloc(void)
 {
 	TA_context* rv = 0;
 
-   mtx_pool.Lock();
-	if (ctx_pool.size())
+   mtx_pool.lock();
+	if (!ctx_pool.empty())
 	{
 		rv = ctx_pool[ctx_pool.size()-1];
 		ctx_pool.pop_back();
 	}
-   mtx_pool.Unlock();
+   mtx_pool.unlock();
 	
 	if (!rv)
    {
@@ -222,7 +229,7 @@ TA_context* tactx_Alloc(void)
 
 void tactx_Recycle(TA_context* poped_ctx)
 {
-   mtx_pool.Lock();
+   mtx_pool.lock();
    if (ctx_pool.size()>2)
    {
       poped_ctx->Free();
@@ -233,7 +240,7 @@ void tactx_Recycle(TA_context* poped_ctx)
       poped_ctx->Reset();
       ctx_pool.push_back(poped_ctx);
    }
-   mtx_pool.Unlock();
+   mtx_pool.unlock();
 }
 
 TA_context* tactx_Find(u32 addr, bool allocnew)
@@ -288,9 +295,16 @@ void SerializeTAContext(void **data, unsigned int *total_size)
 	const u32 taSize = ta_ctx->tad.thd_data - ta_ctx->tad.thd_root;
 	LIBRETRO_S(taSize);
 	LIBRETRO_SA(ta_ctx->tad.thd_root, taSize);
+
+   LIBRETRO_S(ta_ctx->tad.render_pass_count);
+	for (u32 i = 0; i < ta_ctx->tad.render_pass_count; i++)
+	{
+		u32 offset = (u32)(ta_ctx->tad.render_passes[i] - ta_ctx->tad.thd_root);
+		LIBRETRO_S(offset);
+	}
 }
 
-void UnserializeTAContext(void **data, unsigned int *total_size)
+void UnserializeTAContext(void **data, unsigned int *total_size, serialize_version_enum version)
 {
 	u32 address;
 	LIBRETRO_US(address);
@@ -301,4 +315,18 @@ void UnserializeTAContext(void **data, unsigned int *total_size)
 	LIBRETRO_US(size);
 	LIBRETRO_USA(ta_ctx->tad.thd_root, size);
 	ta_ctx->tad.thd_data = ta_ctx->tad.thd_root + size;
+   if (version >= V12)
+	{
+		LIBRETRO_US(ta_ctx->tad.render_pass_count);
+		for (u32 i = 0; i < ta_ctx->tad.render_pass_count; i++)
+		{
+			u32 offset;
+			LIBRETRO_US(offset);
+			ta_ctx->tad.render_passes[i] = ta_ctx->tad.thd_root + offset;
+		}
+	}
+	else
+	{
+		ta_ctx->tad.render_pass_count = 0;
+	}
 }

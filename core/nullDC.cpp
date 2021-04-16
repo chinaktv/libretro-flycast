@@ -38,10 +38,6 @@ extern char *game_data;
 extern bool boot_to_bios;
 extern bool reset_requested;
 
-extern void init_mem();
-extern void arm_Init();
-extern void term_mem();
-
 /*
 	libndc
 
@@ -87,8 +83,8 @@ s32 plugins_Init()
    if (s32 rv = libAICA_Init())
       return rv;
 
-   init_mem();
-   arm_Init();
+   if (s32 rv = libARM_Init())
+      return rv;
 
    //if (s32 rv = libExtDevice_Init())
    //	return rv;
@@ -103,7 +99,6 @@ void plugins_Term(void)
    //term all plugins
    //libExtDevice_Term();
    
-	term_mem();
 	//arm7_Term ?
    libAICA_Term();
 
@@ -111,14 +106,12 @@ void plugins_Term(void)
    libPvr_Term();
 }
 
-void plugins_Reset(bool Manual)
+void plugins_Reset(bool hard)
 {
-	libPvr_Reset(Manual);
-	libGDR_Reset(Manual);
-	libAICA_Reset(Manual);
-
-	arm_Reset();
-	arm_SetEnabled(false);
+	libPvr_Reset(hard);
+	libGDR_Reset(hard);
+	libAICA_Reset(hard);
+   libARM_Reset(hard);
 
 	//libExtDevice_Reset(Manual);
 }
@@ -387,12 +380,12 @@ void dc_prepare_system()
    VRAM_MASK        = (VRAM_SIZE-1);
 }
 
-void dc_reset()
+void dc_reset(bool hard)
 {
-	plugins_Reset(true);
-	mem_Reset(true);
+	plugins_Reset(hard);
+	mem_Reset(hard);
 
-	sh4_cpu.Reset(true);
+	sh4_cpu.Reset(hard);
 }
 
 int dc_init()
@@ -455,7 +448,7 @@ int dc_init()
 	
 	mem_map_default();
 
-	dc_reset();
+	dc_reset(true);
 
 	switch (settings.System)
 	{
@@ -530,7 +523,6 @@ void LoadSettings(void)
 	//disable_nvmem can't be loaded, because nvmem init is before cfg load
 	settings.dynarec.disable_vmem32 = false;
 	settings.UpdateModeForced     = 0;
-	settings.dreamcast.RTC			= GetRTC_now();
 	settings.dreamcast.FullMMU		= false;
 	settings.aica.LimitFPS			= 0;
 	settings.aica.NoSound			= 0;
@@ -562,9 +554,9 @@ void LoadSettings(void)
 	settings.reios.ElfFile               = "";
 
 	settings.validate.OpenGlChecks      = 0;
-}
 
-void SaveSettings(void)
-{
+	settings.network.ActAsServer = false;
+	settings.network.dns = "46.101.91.123";		// Dreamcast Live DNS
+	settings.network.server = "";
+	settings.network.EmulateBBA = false;
 }
-

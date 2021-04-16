@@ -324,7 +324,6 @@ struct maple_device_instance
 //includes from c++rt
 #include <vector>
 #include <string>
-using namespace std;
 
 //used for asm-olny functions
 #if defined(X86) && defined(_MSC_VER)
@@ -349,14 +348,20 @@ using namespace std;
 #endif
 
 //no inline -- fixme
-#ifdef _WIN32
+#ifdef _MSC_VER
 #define NOINLINE __declspec(noinline)
-#define likely(x) x
-#define unlikely(x) x
 #else
 #define NOINLINE __attribute__ ((noinline))
-#define likely(x)       __builtin_expect((x),1)
-#define unlikely(x)       __builtin_expect((x),0)
+#endif
+
+#ifdef _MSC_VER
+#define likely(x) x
+#define unlikely(x) x
+#define expected(x, y) x
+#else
+#define likely(x)      __builtin_expect(!!(x), 1)
+#define unlikely(x)    __builtin_expect(!!(x), 0)
+#define expected(x, y) __builtin_expect((x), (y))
 #endif
 
 //basic includes
@@ -383,7 +388,7 @@ using namespace std;
 #define putinf    LOGI
 #endif
 
-#ifndef RELEASE
+#ifndef NDEBUG
 #define EMUERROR(format, ...) printf("Error in %s:%s:%d: " format "\n", __FILE__,__FUNCTION__ ,__LINE__, ##__VA_ARGS__)
 #else
 #define EMUERROR(...)
@@ -421,12 +426,12 @@ void os_DebugBreak(void);
 #endif
 
 #ifndef NO_VERIFY
-#define verify(x) if((x)==false){ msgboxf("Verify Failed  : " #x "\n in %s -> %s : %d \n",MBX_ICONERROR,(__FUNCTION__),(__FILE__),__LINE__); dbgbreak;}
+#define verify(x) if((x)==false){ dbgbreak;}
 #else
-#define verify(x) if((x)==false){ msgboxf("Verify Failed  : " #x "\n in %s -> %s : %d \n",MBX_ICONERROR,(__FUNCTION__),(__FILE__),__LINE__); }
+#define verify(x) if((x)==false){ }
 #endif
 
-#define die(reason) { msgboxf("Fatal error : %s\n in %s -> %s : %d \n",MBX_ICONERROR,(reason),(__FUNCTION__),(__FILE__),__LINE__); dbgbreak;}
+#define die(reason) { dbgbreak;}
 
 
 //will be removed sometime soon
@@ -516,14 +521,14 @@ enum class JVS {
 
 struct settings_t
 {
-   unsigned System;
+	unsigned System;
 
 	struct {
 		bool UseReios;
 	} bios;
 
 	struct {
-		string ElfFile;
+      std::string ElfFile;
 	} reios;
 
 	struct
@@ -552,13 +557,13 @@ struct settings_t
 	struct
 	{
 		bool Enable;
-      unsigned Type;
+		unsigned Type;
 		bool idleskip;
 		bool unstable_opt;
 		bool disable_nvmem;
 		bool disable_vmem32;
-      bool DisableDivMatching;
-      bool ForceDisableDivMatching;
+		bool DisableDivMatching;
+		bool ForceDisableDivMatching;
 	} dynarec;
 	
 	struct
@@ -568,23 +573,22 @@ struct settings_t
 
 	struct
 	{
-	   u32 cable;			// 0 -> VGA, 1 -> VGA, 2 -> RGB, 3 -> TV
-	   u32 RTC;
-	   u32 region;			// 0 -> JP, 1 -> USA, 2 -> EU, 3 -> default
-	   u32 broadcast;		// 0 -> NTSC, 1 -> PAL, 2 -> PAL/M, 3 -> PAL/N, 4 -> default
-	   u32 language;		// 0 -> JP, 1 -> EN, 2 -> DE, 3 -> FR, 4 -> SP, 5 -> IT, 6 -> default
-	   bool FullMMU;
-	   bool ForceWinCE;
+		u32 cable;			// 0 -> VGA, 1 -> VGA, 2 -> RGB, 3 -> TV
+		u32 region;			// 0 -> JP, 1 -> USA, 2 -> EU, 3 -> default
+		u32 broadcast;		// 0 -> NTSC, 1 -> PAL, 2 -> PAL/M, 3 -> PAL/N, 4 -> default
+		u32 language;		// 0 -> JP, 1 -> EN, 2 -> DE, 3 -> FR, 4 -> SP, 5 -> IT, 6 -> default
+		bool FullMMU;
+		bool ForceWinCE;
 	} dreamcast;
 
 	struct
-   {
-      u32 LimitFPS;		//0 -> no , (1) -> limit
-      u32 CDDAMute;
-      u32 DSPEnabled;		//0 -> no, 1 -> yes
-      u32 NoBatch;
-      u32 NoSound;        //0 ->sound, 1 -> no sound
-   } aica;
+	{
+		u32 LimitFPS;		//0 -> no , (1) -> limit
+		u32 CDDAMute;
+		u32 DSPEnabled;		//0 -> no, 1 -> yes
+		u32 NoBatch;
+		u32 NoSound;        //0 ->sound, 1 -> no sound
+	} aica;
 
 	struct
 	{
@@ -614,8 +618,8 @@ struct settings_t
 			u32 AlphaSortMode;
 			u32 ZBufferMode;
 			u32 TexCacheMode;
-         f32 zMin;
-         f32 zMax;
+			f32 zMin;
+			f32 zMax;
 		} Emulation;
 
 		struct
@@ -632,8 +636,8 @@ struct settings_t
 		u32 SynchronousRendering;
 	} pvr;
 
-   unsigned UpdateMode;
-   unsigned UpdateModeForced;
+	unsigned UpdateMode;
+	unsigned UpdateModeForced;
 
 	struct {
 		bool SerialConsole;
@@ -646,12 +650,18 @@ struct settings_t
 	struct {
 		JVS JammaSetup;
 	} mapping;
+
+	struct {
+		bool ActAsServer;
+		std::string dns;
+		std::string server;
+      bool EmulateBBA;
+	} network;
 };
 
 extern settings_t settings;
 
 void LoadSettings(void);
-void SaveSettings(void);
 u32 GetRTC_now(void);
 
 static inline bool is_s8(u32 v) { return (s8)v==(s32)v; }
@@ -672,10 +682,8 @@ void plugins_Reset(bool Manual);
 
 //PVR
 s32 libPvr_Init(void);
-void libPvr_Reset(bool Manual);
+void libPvr_Reset(bool hard);
 void libPvr_Term(void);
-
-void libPvr_LockedBlockWrite(vram_block* block,u32 addr);	//set to 0 if not used
 
 void* libPvr_GetRenderTarget(void);
 void* libPvr_GetRenderSurface(void);
@@ -693,7 +701,7 @@ void libAICA_Update(u32 cycles);				//called every ~1800 cycles, set to 0 if not
 
 //GDR
 s32 libGDR_Init(void);
-void libGDR_Reset(bool M);
+void libGDR_Reset(bool hard);
 void libGDR_Term(void);
 
 void libCore_gdrom_disc_change(void);
@@ -723,47 +731,53 @@ static void libExtDevice_WriteMem_A0_010(u32 addr,u32 data,u32 size) { }
 static u32 libExtDevice_ReadMem_A5(u32 addr,u32 size){ return 0; }
 static void libExtDevice_WriteMem_A5(u32 addr,u32 data,u32 size) { }
 
-#define 	ReadMemArrRet(arr,addr,sz)				\
-			{if (sz==1)								\
-				return arr[addr];					\
-			else if (sz==2)							\
-				return *(u16*)&arr[addr];			\
-			else if (sz==4)							\
-				return *(u32*)&arr[addr];}	
+//ARM
+s32 libARM_Init();
+void libARM_Reset(bool hard);
+void libARM_Term();
 
-#define WriteMemArr(arr,addr,data,sz)				\
-			{if(sz==1)								\
-				{arr[addr]=(u8)data;}				\
-			else if (sz==2)							\
-				{*(u16*)&arr[addr]=(u16)data;}		\
-			else if (sz==4)							\
-			{*(u32*)&arr[addr]=data;}}	
+template<u32 sz>
+u32 ReadMemArr(u8 *array, u32 addr)
+{
+   switch(sz)
+   {
+      case 1:
+         return array[addr];
+      case 2:
+         return *(u16 *)&array[addr];
+      case 4:
+         return *(u32 *)&array[addr];
+      default:
+         die("invalid size");
+   }
+   return 0;
+}
+
+template<u32 sz>
+void WriteMemArr(u8 *array, u32 addr, u32 data)
+{
+   switch(sz)
+   {
+      case 1:
+         array[addr] = data;
+         break;
+      case 2:
+         *(u16 *)&array[addr] = data;
+         break;
+      case 4:
+         *(u32 *)&array[addr] = data;
+         break;
+      default:
+         die("invalid size");
+         break;
+   }
+}
 
 struct OnLoad
 {
 	typedef void OnLoadFP(void);
 	OnLoad(OnLoadFP* fp) { fp(); }
 };
-
-void os_DoEvents();
-double os_GetSeconds();
-
-#ifdef _MSC_VER
-#include <intrin.h>
-#endif
-
-u32 static INLINE bitscanrev(u32 v)
-{
-#ifdef _MSC_VER
-	unsigned long rv;
-	_BitScanReverse(&rv,v);
-	return rv;
-#else
-	return 31-__builtin_clz(v);
-#endif
-}
-
-void os_DebugBreak(void);
 
 bool ra_serialize(const void *src, unsigned int src_size, void **dest, unsigned int *total_size) ;
 bool ra_unserialize(void *src, unsigned int src_size, void **dest, unsigned int *total_size);
@@ -778,8 +792,6 @@ bool dc_unserialize(void **data, unsigned int *total_size, size_t actual_data_si
 
 
 extern "C" void DYNACALL TAWriteSQ(u32 address,u8* sqb) ;
-
-#define SAMPLE_COUNT 512
 
 struct SoundFrame
 {
@@ -897,4 +909,7 @@ enum serialize_version_enum {
 	V9,
 	V10,
 	V11,
+   V12,
+   V13,
+   VCUR_LIBRETRO = V13,
 };

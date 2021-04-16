@@ -28,7 +28,7 @@ static const char *PipelineCacheFileName = "vulkan_pipeline.cache";
 
 const VkApplicationInfo* VkGetApplicationInfo()
 {
-	// FIXME How to figure out if vulkan 1.1 is supported?
+	// apiVersion is the maximum vulkan version supported by the app
 	static vk::ApplicationInfo applicationInfo("Flycast", 1, "Flycast", 1, VK_API_VERSION_1_1);
 	return &(VkApplicationInfo&)applicationInfo;
 }
@@ -181,8 +181,16 @@ bool VulkanContext::Init(retro_hw_render_interface_vulkan *retro_render_if)
 	queue = vk::Queue(retro_render_if->queue);
 
 	vk::PhysicalDeviceProperties *properties;
-	if (::vkGetPhysicalDeviceFormatProperties2 != nullptr)
+	static vk::PhysicalDeviceProperties props;
+	physicalDevice.getProperties(&props);
+	
+	NOTICE_LOG(RENDERER, "GPU Supports Vulkan API: %u.%u.%u",
+						  VK_VERSION_MAJOR(props.apiVersion),
+						  VK_VERSION_MINOR(props.apiVersion),
+						  VK_VERSION_PATCH(props.apiVersion));
+	if (VK_VERSION_MINOR(props.apiVersion) >= 1 && ::vkGetPhysicalDeviceFormatProperties2 != nullptr)
 	{
+		NOTICE_LOG(RENDERER, "GPU Supports vkGetPhysicalDeviceProperties2");
 		static vk::PhysicalDeviceProperties2 properties2;
 		vk::PhysicalDeviceMaintenance3Properties properties3;
 		properties2.pNext = &properties3;
@@ -192,8 +200,6 @@ bool VulkanContext::Init(retro_hw_render_interface_vulkan *retro_render_if)
 	}
 	else
 	{
-		static vk::PhysicalDeviceProperties props;
-		physicalDevice.getProperties(&props);
 		properties = &props;
 		maxMemoryAllocationSize = 0xFFFFFFFFu;
 	}

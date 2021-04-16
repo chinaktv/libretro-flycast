@@ -278,6 +278,7 @@ u32 mmu_full_SQ(u32 va, u32& rv)
 	return MMU_ERROR_NONE;
 }
 template u32 mmu_full_SQ<MMU_TT_DREAD>(u32 va, u32& rv);
+template u32 mmu_full_SQ<MMU_TT_DWRITE>(u32 va, u32& rv);
 
 template<u32 translation_type, typename T>
 u32 mmu_data_translation(u32 va, u32& rv)
@@ -296,8 +297,9 @@ u32 mmu_data_translation(u32 va, u32& rv)
 		}
 	}
 
-	if (sr.MD == 1 && ((va & 0xFC000000) == 0x7C000000))
+   if ((va & 0xFC000000) == 0x7C000000)
 	{
+      // On-chip RAM area isn't translated
 		rv = va;
 		return MMU_ERROR_NONE;
 	}
@@ -310,7 +312,9 @@ u32 mmu_data_translation(u32 va, u32& rv)
 
 	const TLB_Entry *entry;
 	u32 lookup = mmu_full_lookup(va, &entry, rv);
-
+   if (lookup == MMU_ERROR_NONE && (rv & 0x1C000000) == 0x1C000000)
+		// map 1C000000-1FFFFFFF to P4 memory-mapped registers
+		rv |= 0xF0000000;
 #ifdef TRACE_WINCE_SYSCALLS
 	if (unresolved_unicode_string != 0 && lookup == MMU_ERROR_NONE)
 	{

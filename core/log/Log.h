@@ -22,6 +22,7 @@ enum LOG_TYPE
 	MAPLE,
 	INTERPRETER,
 	MEMORY,
+	NETWORK,
 	VMEM,
 	MODEM,
 	NAOMI,
@@ -49,12 +50,12 @@ static const char LOG_LEVEL_TO_CHAR[7] = "-NEWID";
 
 void GenericLog(LogTypes::LOG_LEVELS level, LogTypes::LOG_TYPE type, const char* file, int line,
 		const char* fmt, ...)
-#ifdef __GNUC__
+#if defined(__GNUC__) && !defined(__MINGW32__)
 __attribute__((format(printf, 5, 6)))
 #endif
 ;
 
-#if !defined(RELEASE) || defined(DEBUGFAST)
+#if !defined(NDEBUG) || defined(DEBUGFAST)
 #define MAX_LOGLEVEL LogTypes::LOG_LEVELS::LDEBUG
 #else
 #ifndef MAX_LOGLEVEL

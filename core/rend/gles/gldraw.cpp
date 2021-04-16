@@ -6,7 +6,7 @@ Drawing and related state management
 Takes vertex, textures and renders to the currently set up target
 */
 
-const static u32 CullMode[]= 
+const static u32 CullModes[]= 
 {
 	GL_NONE, //0    No culling          No culling
 	GL_NONE, //1    Cull if Small       Cull if ( |det| < fpu_cull_val )
@@ -69,14 +69,14 @@ extern u32 gcflip;
 GLuint vmuTextureId[4]={0,0,0,0};
 GLuint lightgunTextureId[4]={0,0,0,0};
 
-void SetCull(u32 CulliMode)
+void SetCull(u32 CullMode)
 {
-	if (CullMode[CulliMode]==GL_NONE)
+	if (CullModes[CullMode] == GL_NONE)
 		glcache.Disable(GL_CULL_FACE);
 	else
 	{
 		glcache.Enable(GL_CULL_FACE);
-		glcache.CullFace(CullMode[CulliMode]); //GL_FRONT/GL_BACK, ...
+		glcache.CullFace(CullModes[CullMode]); //GL_FRONT/GL_BACK, ...
 	}
 }
 
@@ -120,7 +120,7 @@ __forceinline
 	TileClipping clipmode = GetTileClip(gp->tileclip, ViewportMatrix, clip_rect);
 	bool palette = BaseTextureCacheData::IsGpuHandledPaletted(gp->tsp, gp->tcw);
 
-	CurrentShader = GetProgram(Type == ListType_Punch_Through ? 1 : 0,
+	CurrentShader = GetProgram(Type == ListType_Punch_Through ? true : false,
 								  clipmode == TileClipping::Inside,
 								  gp->pcw.Texture,
 								  gp->tsp.UseAlpha,
@@ -272,7 +272,7 @@ static void SortTriangles(int first, int count)
 	GenSorted(first, count, pidx_sort, vidx_sort);
 
 	//Upload to GPU if needed
-	if (pidx_sort.size())
+	if (!pidx_sort.empty())
 	{
 		//Bind and upload sorted index buffer
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gl.vbo.idxs2); glCheck();
@@ -295,7 +295,7 @@ static void SortTriangles(int first, int count)
 void DrawSorted(bool multipass)
 {
 	//if any drawing commands, draw them
-	if (pidx_sort.size())
+	if (!pidx_sort.empty())
 	{
 		u32 count=pidx_sort.size();
 
@@ -643,7 +643,7 @@ static void DrawQuad(GLuint texId, float x, float y, float w, float h, float u0,
 
 	ShaderUniforms.trilinear_alpha = 1.0;
 
-	PipelineShader *shader = GetProgram(0, false, 1, 0, 1, 0, 0, 2, false, false, false, false, false);
+	PipelineShader *shader = GetProgram(false, false, true, false, true, 0, false, 2, false, false, false, false, false);
 	glcache.UseProgram(shader->program);
 
 	glActiveTexture(GL_TEXTURE0);

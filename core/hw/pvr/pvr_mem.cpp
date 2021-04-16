@@ -5,17 +5,14 @@
 	Most of this was hacked together when i needed support for YUV-dma for thps2 ;)
 */
 
-#include "types.h"
 #include "pvr_mem.h"
 #include "spg.h"
-#include "ta.h"
 #include "Renderer_if.h"
-#include "hw/mem/_vmem.h"
 
-//TODO : move code later to a plugin
-//TODO : Fix registers arrays , they must be smaller now doe to the way SB registers are handled
-#include "hw/holly/holly_intc.h"
 #include "hw/holly/sb.h"
+#include "hw/holly/holly_intc.h"
+
+static u32 pvr_map32(u32 offset32);
 
 //YUV converter code :)
 //inits the YUV converter
@@ -37,7 +34,7 @@ void YUV_init(void)
 {
    YUV_x_curr     = 0;
    YUV_y_curr     = 0;
-   YUV_dest       = TA_YUV_TEX_BASE&VRAM_MASK;//TODO : add the masking needed
+   YUV_dest       = TA_YUV_TEX_BASE & VRAM_MASK;
    TA_YUV_TEX_CNT = 0;
    YUV_blockcount = (TA_YUV_TEX_CTRL.yuv_u_size + 1) * (TA_YUV_TEX_CTRL.yuv_v_size + 1);
 
@@ -47,7 +44,7 @@ void YUV_init(void)
       YUV_x_size     = 16;
       YUV_y_size     = 16;
    }
-   else // yesh!!!
+   else
    {
       YUV_x_size = (TA_YUV_TEX_CTRL.yuv_u_size + 1) * 16;
       YUV_y_size = (TA_YUV_TEX_CTRL.yuv_v_size + 1) * 16;
@@ -55,38 +52,12 @@ void YUV_init(void)
    YUV_index = 0;
 }
 
-
-static INLINE u8 GetY420(int x, int y,u8* base)
-{
-	//u32 base=0;
-	if (x > 7)
-	{
-		x -= 8;
-		base += 64;
-	}
-
-	if (y > 7)
-	{
-		y -= 8;
-		base += 128;
-	}
-	
-	return base[x+y*8];
-}
-
-static INLINE u8 GetUV420(int x, int y,u8* base)
-{
-	int realx=x>>1;
-	int realy=y>>1;
-
-	return base[realx+realy*8];
-}
-
 #ifdef HAVE_LIBNX
 #pragma GCC push_options
 #pragma GCC optimize ("-O2")
 #endif
-void YUV_Block8x8(u8* inuv,u8* iny, u8* out)
+
+static void YUV_Block8x8(const u8* inuv, const u8* iny, u8* out)
 {
 	u8* line_out_0=out+0;
 	u8* line_out_1=out+YUV_x_size*2;
@@ -212,72 +183,46 @@ void YUV_data(u32* data , u32 count)
 	verify(count==0);
 }
 
-//Regs
-
 //vram 32-64b
 
 //read
-u8 DYNACALL pvr_read_area1_8(u32 addr)
+template<typename T>
+T DYNACALL pvr_read_area1(u32 addr)
 {
-	return vram[pvr_map32(addr)];
+	return *(T *)&vram[pvr_map32(addr)];
 }
-
-u16 DYNACALL pvr_read_area1_16(u32 addr)
-{
-   return *(u16*)&vram.data[pvr_map32(addr)];
-}
-u32 DYNACALL pvr_read_area1_32(u32 addr)
-{
-   return *(u32*)&vram.data[pvr_map32(addr)];
-}
+template u8 pvr_read_area1<u8>(u32 addr);
+template u16 pvr_read_area1<u16>(u32 addr);
+template u32 pvr_read_area1<u32>(u32 addr);
 
 //write
-void DYNACALL pvr_write_area1_8(u32 addr,u8 data)
+template<typename T>
+void DYNACALL pvr_write_area1(u32 addr, T data)
 {
-   INFO_LOG(MEMORY, "%08x: 8-bit VRAM writes are not possible", addr);
-}
+	if (sizeof(T) == 1)
+	{
+		INFO_LOG(MEMORY, "%08x: 8-bit VRAM writes are not possible", addr);
+		return;
+	}
+	u32 vaddr = addr & VRAM_MASK;
+	if (vaddr >= fb_watch_addr_start && vaddr < fb_watch_addr_end)
+		fb_dirty = true;
 
-void DYNACALL pvr_write_area1_16(u32 addr,u16 data)
+	*(T *)&vram[pvr_map32(addr)] = data;
+}
+template void pvr_write_area1<u8>(u32 addr, u8 data);
+template void pvr_write_area1<u16>(u32 addr, u16 data);
+template void pvr_write_area1<u32>(u32 addr, u32 data);
+
+void TAWrite(u32 address, u32* data, u32 count)
 {
-   u32 vaddr = addr & VRAM_MASK;
-   if (vaddr >= fb_watch_addr_start && vaddr < fb_watch_addr_end)
-   {
-      fb_dirty = true;
-   }
-   *(u16*)&vram.data[pvr_map32(addr)]=data;
+   if ((address & 0x800000) == 0)
+      // TA poly
+      ta_vtx_data(data, count);
+   else
+      // YUV Converter
+      YUV_data(data, count);
 }
-
-void DYNACALL pvr_write_area1_32(u32 addr,u32 data)
-{
-   u32 vaddr = addr & VRAM_MASK;
-   if (vaddr >= fb_watch_addr_start && vaddr < fb_watch_addr_end)
-   {
-      fb_dirty = true;
-   }
-   *(u32*)&vram.data[pvr_map32(addr)] = data;
-}
-
-void TAWrite(u32 address,u32* data,u32 count)
-{
-   u32 address_w=address&0x1FFFFFF;//correct ?
-   if (address_w<0x800000)//TA poly
-   {
-      ta_vtx_data(data,count);
-   }
-   else if(address_w<0x1000000) //Yuv Converter
-   {
-      YUV_data(data,count);
-   }
-   else //Vram Writef
-   {
-		//shouldn't really get here (?) -> works on dc :D need to handle lmmodes
-		DEBUG_LOG(MEMORY, "Vram TAWrite 0x%X , bkls %d\n", address, count);
-		verify(SB_LMMODE0 == 0);
-		memcpy(&vram.data[address & VRAM_MASK],data,count * 32);
-   }
-}
-
-#include "hw/sh4/sh4_mmr.h"
 
 void NOINLINE MemWrite32(void* dst, void* src)
 {
@@ -287,33 +232,32 @@ void NOINLINE MemWrite32(void* dst, void* src)
 #if HOST_CPU!=CPU_ARM
 extern "C" void DYNACALL TAWriteSQ(u32 address,u8* sqb)
 {
-   u32 address_w=address&0x1FFFFFF;//correct ?
-   u8* sq=&sqb[address&0x20];
+   u32 address_w = address & 0x01FFFFE0;
+   u8* sq = &sqb[address & 0x20];
 
-   if (likely(address_w<0x800000))//TA poly
+   if (likely(address_w < 0x800000))//TA poly
    {
       ta_vtx_data32(sq);
    }
-   else if(likely(address_w<0x1000000)) //Yuv Converter
+   else if(likely(address_w < 0x1000000)) //Yuv Converter
    {
-      YUV_data((u32*)sq,1);
+      YUV_data((u32*)sq, 1);
    }
    else //Vram Writef
    {
 		// Used by WinCE
 		DEBUG_LOG(MEMORY, "Vram TAWriteSQ 0x%X SB_LMMODE0 %d", address, SB_LMMODE0);
-		if (SB_LMMODE0 == 0)
+      bool path64b = (address & 0x02000000 ? SB_LMMODE1 : SB_LMMODE0) == 0;
+		if (path64b)
 		{
 			// 64b path
-			MemWrite32(&vram[address_w&(VRAM_MASK-0x1F)],sq);
+         memcpy(&vram[address_w & VRAM_MASK], sq, 32);
 		}
 		else
 		{
 			// 32b path
 			for (int i = 0; i < 8; i++, address_w += 4)
-			{
-				pvr_write_area1_32(address_w, ((u32 *)sq)[i]);
-			}
+            pvr_write_area1<u32>(address_w, ((u32 *)sq)[i]);
 		}
    }
 }
@@ -321,27 +265,20 @@ extern "C" void DYNACALL TAWriteSQ(u32 address,u8* sqb)
 
 //Misc interface
 
-//Reset -> Reset - Initialise to default values
-void pvr_Reset(bool Manual)
-{
-   if (!Manual)
-      vram.Zero();
-}
-
 #define VRAM_BANK_BIT 0x400000
 
-u32 pvr_map32(u32 offset32)
+static u32 pvr_map32(u32 offset32)
 {
-   //64b wide bus is achieved by interleaving the banks every 32 bits
-   const u32 bank_bit = VRAM_BANK_BIT;
-   const u32 static_bits = (VRAM_MASK - (VRAM_BANK_BIT * 2 - 1)) | 3;
-   const u32 offset_bits = (VRAM_BANK_BIT - 1) & ~3;
-   u32 bank = (offset32 & VRAM_BANK_BIT) / VRAM_BANK_BIT;
-   u32 rv = offset32 & static_bits;
-   rv |= (offset32 & offset_bits) * 2;
-   rv |= bank * 4;
+	//64b wide bus is achieved by interleaving the banks every 32 bits
+	const u32 bank_bit = VRAM_BANK_BIT;
+	const u32 static_bits = VRAM_MASK - (VRAM_BANK_BIT * 2 - 1) + 3;
+	const u32 offset_bits = (VRAM_BANK_BIT - 1) & ~3;
+	u32 bank = (offset32 & VRAM_BANK_BIT) / VRAM_BANK_BIT;
+	u32 rv = offset32 & static_bits;
+	rv |= (offset32 & offset_bits) * 2;
+	rv |= bank * 4;
 
-   return rv;
+	return rv;
 }
 
 f32 vrf(u32 addr)
@@ -352,3 +289,35 @@ u32 vri(u32 addr)
 {
 	return *(u32*)&vram.data[pvr_map32(addr)];
 }
+
+template<typename T, bool upper>
+T pvr_read_area4(u32 addr)
+{
+	bool access32 = (upper ? SB_LMMODE1 : SB_LMMODE0) == 1;
+	if (access32)
+		return pvr_read_area1<T>(addr);
+	else
+		return *(T*)&vram[addr & VRAM_MASK];
+}
+template u8 pvr_read_area4<u8, false>(u32 addr);
+template u16 pvr_read_area4<u16, false>(u32 addr);
+template u32 pvr_read_area4<u32, false>(u32 addr);
+template u8 pvr_read_area4<u8, true>(u32 addr);
+template u16 pvr_read_area4<u16, true>(u32 addr);
+template u32 pvr_read_area4<u32, true>(u32 addr);
+
+template<typename T, bool upper>
+void pvr_write_area4(u32 addr, T data)
+{
+	bool access32 = (upper ? SB_LMMODE1 : SB_LMMODE0) == 1;
+	if (access32)
+		pvr_write_area1(addr, data);
+	else
+		*(T*)&vram[addr & VRAM_MASK] = data;
+}
+template void pvr_write_area4<u8, false>(u32 addr, u8 data);
+template void pvr_write_area4<u16, false>(u32 addr, u16 data);
+template void pvr_write_area4<u32, false>(u32 addr, u32 data);
+template void pvr_write_area4<u8, true>(u32 addr, u8 data);
+template void pvr_write_area4<u16, true>(u32 addr, u16 data);
+template void pvr_write_area4<u32, true>(u32 addr, u32 data);

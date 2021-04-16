@@ -1,5 +1,4 @@
 #pragma once
-#include "drkPvr.h"
 #include "ta_ctx.h"
 
 extern u32 VertexCount;
@@ -16,7 +15,9 @@ void rend_swap_frame();
 
 void rend_set_fb_scale(float x,float y);
 void rend_resize(int width, int height);
-void rend_text_invl(vram_block* bl);
+
+/* forward declaration */
+void dc_stop();
 
 #ifdef GLuint
 GLuint
@@ -44,7 +45,18 @@ struct Renderer
 	virtual bool Process(TA_context* ctx)=0;
 	virtual bool Render()=0;
 
-	virtual void Present()=0;
+	virtual void Present() 
+   {
+      /* co_dc_yield - yields back to main cooperative thread */
+#if !defined(TARGET_NO_THREADS)
+      if (!settings.rend.ThreadedRendering)
+#endif
+      {
+         if (settings.UpdateMode || settings.UpdateModeForced)
+            return;
+         dc_stop();
+      }
+   }
 
 	virtual void DrawOSD() { }
 

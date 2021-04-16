@@ -244,7 +244,7 @@ public:
 	}
 
 	void Cleanup() {
-		verify(final_opend || block->oplist.size() == 0);
+		verify(final_opend || block->oplist.empty());
 		final_opend = false;
 		FlushAllRegs(true);
 		verify(reg_alloced.empty());
@@ -576,9 +576,9 @@ private:
 	}
 
 	RuntimeBlockInfo* block = NULL;
-	deque<nreg_t> host_gregs;
-	deque<nregf_t> host_fregs;
-	vector<Sh4RegType> pending_flushes;
+   std::deque<nreg_t> host_gregs;
+   std::deque<nregf_t> host_fregs;
+   std::vector<Sh4RegType> pending_flushes;
 	std::map<Sh4RegType, reg_alloc> reg_alloced;
 	int opnum = 0;
 

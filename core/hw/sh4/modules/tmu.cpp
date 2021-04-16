@@ -77,17 +77,17 @@ void UpdateTMU_i(u32 Cycles)
 u32 tmu_ch_base[3];
 u64 tmu_ch_base64[3];
 
-u32 read_TMU_TCNTch(u32 ch)
+static u32 read_TMU_TCNTch(u32 ch)
 {
 	return tmu_ch_base[ch] - ((sh4_sched_now64() >> tmu_shift[ch])&tmu_mask[ch]);
 }
 
-s64 read_TMU_TCNTch64(u32 ch)
+static s64 read_TMU_TCNTch64(u32 ch)
 {
 	return tmu_ch_base64[ch] - ((sh4_sched_now64() >> tmu_shift[ch])&tmu_mask64[ch]);
 }
 
-void sched_chan_tick(int ch)
+static void sched_chan_tick(int ch)
 {
 	//schedule next interrupt
 	//return TMU_TCOR(ch) << tmu_shift[ch];
@@ -109,7 +109,7 @@ void sched_chan_tick(int ch)
 	//sched_tmu_cb
 }
 
-void write_TMU_TCNTch(u32 ch, u32 data)
+static void write_TMU_TCNTch(u32 ch, u32 data)
 {
 	//u32 TCNT=read_TMU_TCNTch(ch);
 	tmu_ch_base[ch]=data+((sh4_sched_now64()>>tmu_shift[ch])&tmu_mask[ch]);
@@ -130,7 +130,7 @@ void write_TMU_TCNT(u32 addr, u32 data)
 	write_TMU_TCNTch(ch,data);
 }
 
-void turn_on_off_ch(u32 ch, bool on)
+static void turn_on_off_ch(u32 ch, bool on)
 {
 	u32 TCNT=read_TMU_TCNTch(ch);
 	tmu_mask[ch]=on?0xFFFFFFFF:0x00000000;
@@ -139,7 +139,7 @@ void turn_on_off_ch(u32 ch, bool on)
 }
 
 //Update internal counter registers
-void UpdateTMUCounts(u32 reg)
+static void UpdateTMUCounts(u32 reg)
 {
 	InterruptPend(tmu_intID[reg],TMU_TCR(reg) & tmu_underflow);
 	InterruptMask(tmu_intID[reg],TMU_TCR(reg) & tmu_UNIE);
@@ -197,18 +197,18 @@ void TMU_TCR_write(u32 addr, u32 data)
 }
 
 //Chan 2 not used functions
-u32 TMU_TCPR2_read(u32 addr)
+static u32 TMU_TCPR2_read(u32 addr)
 {
 	INFO_LOG(SH4, "Read from TMU_TCPR2 - this register should be not used on Dreamcast according to docs");
 	return 0;
 }
 
-void TMU_TCPR2_write(u32 addr, u32 data)
+static void TMU_TCPR2_write(u32 addr, u32 data)
 {
 	INFO_LOG(SH4, "Write to TMU_TCPR2 - this register should be not used on Dreamcast according to docs, data=%d", data);
 }
 
-void write_TMU_TSTR(u32 addr, u32 data)
+static void write_TMU_TSTR(u32 addr, u32 data)
 {
 	TMU_TSTR=data;
 	//?
@@ -217,7 +217,7 @@ void write_TMU_TSTR(u32 addr, u32 data)
 		turn_on_off_ch(i,data&(1<<i));
 }
 
-int sched_tmu_cb(int ch, int sch_cycl, int jitter)
+static int sched_tmu_cb(int ch, int sch_cycl, int jitter)
 {
 	if (tmu_mask[ch]) {
 		
@@ -296,8 +296,17 @@ void tmu_init()
 }
 
 
-void tmu_reset()
+void tmu_reset(bool hard)
 {
+	if (hard)
+	{
+		memset(tmu_shift, 0, sizeof(tmu_shift));
+		memset(tmu_mask, 0, sizeof(tmu_mask));
+		memset(tmu_mask64, 0, sizeof(tmu_mask64));
+		memset(old_mode, 0xFF, sizeof(old_mode));
+		memset(tmu_ch_base, 0, sizeof(tmu_ch_base));
+		memset(tmu_ch_base64, 0, sizeof(tmu_ch_base64));
+	}
 	TMU_TOCR=TMU_TSTR=0;
 	TMU_TCOR(0) = TMU_TCOR(1) = TMU_TCOR(2) = 0xffffffff;
 //	TMU_TCNT(0) = TMU_TCNT(1) = TMU_TCNT(2) = 0xffffffff;

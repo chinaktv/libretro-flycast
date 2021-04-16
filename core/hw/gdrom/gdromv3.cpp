@@ -565,8 +565,7 @@ void gd_process_spi_cmd()
 		packet_cmd.data_8[6], packet_cmd.data_8[7], packet_cmd.data_8[8], packet_cmd.data_8[9], packet_cmd.data_8[10], packet_cmd.data_8[11] );
 
 	if (sns_key == 0x0 			// No sense
-			|| sns_key == 0xB	// Aborted
-			|| sns_key == 6) 	// Unit attention
+			|| sns_key == 0xB)	// Aborted
 		GDStatus.CHECK=0;
 	else
 		GDStatus.CHECK=1;
@@ -1043,17 +1042,18 @@ static int getGDROMTicks()
    {
 	  if (GDROM_TICK < 1500000)
 		 return GDROM_TICK;
-	  if (SB_GDLEN - SB_GDLEND > 10240)
+     u32 len = SB_GDLEN == 0 ? 0x02000000 : SB_GDLEN;
+     if (len - SB_GDLEND > 10240)
 		 return 1000000;										// Large transfers: GD-ROM transfer rate 1.8 MB/s
 	  else
-		 return min((u32)10240, SB_GDLEN - SB_GDLEND) * 2;	// Small transfers: Max G1 bus rate: 50 MHz x 16 bits
+        return   std::min((u32)10240, len - SB_GDLEND) * 2;	// Small transfers: Max G1 bus rate: 50 MHz x 16 bits
    }
    else
 	  return 0;
 }
 
 //is this needed ?
-int GDRomschd(int i, int c, int j)
+static int GDRomschd(int i, int c, int j)
 {
 	if (SecNumber.Status == GD_SEEK)
 	{
@@ -1068,12 +1068,9 @@ int GDRomschd(int i, int c, int j)
 	if(!(SB_GDST&1) || !(SB_GDEN &1) || (read_buff.cache_size==0 && read_params.remaining_sectors==0))
 		return 0;
 
-	//TODO : Fix dmaor
-	u32 dmaor = DMAC_DMAOR.full;
+   u32 src = SB_GDSTARD;
+   u32 len = (SB_GDLEN == 0 ? 0x02000000 : SB_GDLEN) - SB_GDLEND;
 
-	u32 src = SB_GDSTARD,
-		len = SB_GDLEN-SB_GDLEND ;
-	
 	if(SB_GDLEN & 0x1F) 
 	{
 		die("\n!\tGDROM: SB_GDLEN has invalid size !\n");
@@ -1083,15 +1080,15 @@ int GDRomschd(int i, int c, int j)
 	//if we don't have any more sectors to read
    //make sure we don't underrun the cache :)
 	if (read_params.remaining_sectors == 0)
-		len = min(len, read_buff.cache_size);
+		len = std::min(len, read_buff.cache_size);
 
-	len = min(len, (u32)10240);
+	len = std::min(len, (u32)10240);
 
 #if 0
 	// do we need to do this for GDROM DMA?
-	if(0x8201 != (dmaor &DMAOR_MASK))
+   if (0x8201 != (DMAC_DMAOR.full & DMAOR_MASK))
 	{
-		INFO_LOG(GDROM, "GDROM: DMAOR has invalid settings (%X)", dmaor);
+      INFO_LOG(GDROM, "GDROM: DMAOR has invalid settings (%X)", DMAC_DMAOR.full);
 		//return;
 	}
 
@@ -1126,17 +1123,13 @@ int GDRomschd(int i, int c, int j)
 		WARN_LOG(GDROM, "GDROM: SB_GDDIR %X (TO AICA WAVE MEM?)", src);
 	}
 
-	//SB_GDLEN = 0x00000000; //13/5/2k7 -> according to docs these regs are not updated by hardware
-	//SB_GDSTAR = (src + len_backup);
+   SB_GDLEND = (SB_GDLEND + len_backup) & 0x01ffffe0;
+   SB_GDSTARD += len_backup;
 
-	SB_GDLEND+= len_backup;
-	SB_GDSTARD+= len_backup;//(src + len_backup)&0x1FFFFFFF;
 
-	if (SB_GDLEND==SB_GDLEN)
+	if (SB_GDLEND == SB_GDLEN)
 	{
-		//printf("Streamed GDMA end - %d bytes transferred\n",SB_GDLEND);
-		SB_GDST=0;//done
-		// The DMA end interrupt flag
+      SB_GDST = 0;
 		asic_RaiseInterrupt(holly_GDROM_DMA);
 	}
 	//Read ALL sectors
@@ -1200,7 +1193,7 @@ void gdrom_reg_Term(void)
 	
 }
 
-void gdrom_reg_Reset(bool Manual)
+void gdrom_reg_Reset(bool hard)
 {
 	SB_GDST = 0;
 	SB_GDEN = 0;

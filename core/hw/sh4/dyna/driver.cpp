@@ -80,7 +80,8 @@ static void recSh4_ClearCache(void)
 
 static void recSh4_Run(void)
 {
-	sh4_int_bCpuRun=true;
+   sh4_int_bCpuRun = true;
+	RestoreHostRoundingMode();
 
 	sh4_dyna_rcb=(u8*)&Sh4cntx + sizeof(Sh4cntx);
 	INFO_LOG(DYNAREC, "cntx // fpcb offset: %td // pc offset: %td // pc %08X", (u8*)&sh4rcb.fpcb - sh4_dyna_rcb, (u8*)&sh4rcb.cntx.pc - sh4_dyna_rcb, sh4rcb.cntx.pc);
@@ -270,6 +271,12 @@ u32 DYNACALL rdv_DoInterrupts_pc(u32 pc) {
 	return next_pc;
 }
 
+static void ngen_FailedToFindBlock_internal() {
+	rdv_FailedToFindBlock(Sh4cntx.pc);
+}
+
+void (*ngen_FailedToFindBlock)() = &ngen_FailedToFindBlock_internal;
+
 u32 DYNACALL rdv_DoInterrupts(void* block_cpde)
 {
 	RuntimeBlockInfoPtr rbi = bm_GetBlock2(block_cpde);
@@ -405,11 +412,10 @@ static void recSh4_Skip(void)
 	Sh4_int_Skip();
 }
 
-static void recSh4_Reset(bool Manual)
+static void recSh4_Reset(bool hard)
 {
-	Sh4_int_Reset(Manual);
+	Sh4_int_Reset(hard);
 	recSh4_ClearCache();
-	bm_Reset();
 }
 
 static void recSh4_Init(void)
@@ -470,17 +476,17 @@ static bool recSh4_IsCpuRunning(void)
 	return Sh4_int_IsCpuRunning();
 }
 
-void Get_Sh4Recompiler(sh4_if* rv)
+void Get_Sh4Recompiler(sh4_if* cpu)
 {
-	rv->Run = recSh4_Run;
-	rv->Stop = recSh4_Stop;
-	rv->Start = recSh4_Start;
-	rv->Step = recSh4_Step;
-	rv->Skip = recSh4_Skip;
-	rv->Reset = recSh4_Reset;
-	rv->Init = recSh4_Init;
-	rv->Term = recSh4_Term;
-	rv->IsCpuRunning = recSh4_IsCpuRunning;
-	rv->ResetCache = recSh4_ClearCache;
+	cpu->Run = recSh4_Run;
+	cpu->Stop = recSh4_Stop;
+	cpu->Start = recSh4_Start;
+	cpu->Step = recSh4_Step;
+	cpu->Skip = recSh4_Skip;
+	cpu->Reset = recSh4_Reset;
+	cpu->Init = recSh4_Init;
+	cpu->Term = recSh4_Term;
+	cpu->IsCpuRunning = recSh4_IsCpuRunning;
+	cpu->ResetCache = recSh4_ClearCache;
 }
 #endif  // FEAT_SHREC != DYNAREC_NONE

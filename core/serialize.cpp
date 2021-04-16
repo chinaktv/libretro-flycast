@@ -25,8 +25,10 @@
 #include "rend/gles/gles.h"
 #include "hw/sh4/dyna/blockmanager.h"
 #include "hw/sh4/dyna/ngen.h"
-#include "hw/naomi/naomi_cart.h"
 #include "hw/naomi/naomi.h"
+#include "hw/naomi/naomi_cart.h"
+#include "hw/sh4/sh4_cache.h"
+#include "hw/bba/bba.h"
 
 #define LIBRETRO_SKIP(size) do { if (*data) *(u8**)data += (size); *total_size += (size); } while (false)
 
@@ -124,7 +126,7 @@ extern maple_device* MapleDevices[4][6];
 extern int maple_sched;
 extern bool maple_ddt_pending_reset;
 
-#ifdef HAVE_MODEM
+#ifdef ENABLE_MODEM
 //./core/hw/modem/modem.cpp
 extern int modem_sched;
 #endif
@@ -132,6 +134,7 @@ extern int modem_sched;
 
 //./core/hw/pvr/Renderer_if.o
 extern bool pend_rend;
+extern u32 fb_w_cur;
 
 //./core/hw/pvr/pvr_mem.o
 extern u32 YUV_tempdata[512/4];//512 bytes
@@ -149,8 +152,8 @@ extern u8 pvr_regs[pvr_RegSize];
 //./core/hw/pvr/spg.o
 extern u32 in_vblank;
 extern u32 clc_pvr_scanline;
-extern int render_end_sched;
-extern int vblank_sched;
+extern int render_end_schid;
+extern int vblank_schid;
 
 //./core/hw/pvr/ta.o
 extern u8 ta_fsm[2049];	//[2048] stores the current state
@@ -191,7 +194,7 @@ extern Sh4RCB* p_sh4rcb;
 
 //./core/hw/sh4/sh4_sched.o
 extern u64 sh4_sched_ffb;
-extern vector<sched_list> sch_list;
+extern std::vector<sched_list> sch_list;
 
 //./core/hw/sh4/interpr/sh4_interpreter.o
 extern int aica_schid;
@@ -313,7 +316,7 @@ bool dc_serialize(void **data, unsigned int *total_size)
 {
 	int i = 0;
 	int j = 0;
-	serialize_version_enum version = V11;
+	serialize_version_enum version = VCUR_LIBRETRO;
 
 	*total_size = 0 ;
 
@@ -418,6 +421,7 @@ bool dc_serialize(void **data, unsigned int *total_size)
 
 	LIBRETRO_S(in_vblank);
 	LIBRETRO_S(clc_pvr_scanline);
+   LIBRETRO_S(fb_w_cur);
 
 	LIBRETRO_S(ta_fsm[2048]);
 	LIBRETRO_S(ta_fsm_cl);
@@ -438,6 +442,8 @@ bool dc_serialize(void **data, unsigned int *total_size)
 	register_serialize(TMU, data, total_size) ;
 	register_serialize(SCI, data, total_size) ;
 	register_serialize(SCIF, data, total_size) ;
+	icache.Serialize(data, total_size);
+	ocache.Serialize(data, total_size);
 
 	LIBRETRO_SA(mem_b.data, mem_b.size);
 
@@ -499,18 +505,26 @@ bool dc_serialize(void **data, unsigned int *total_size)
 	   LIBRETRO_S(sch_list[tmu_sched[i]].end) ;
 	}
 
-	LIBRETRO_S(sch_list[render_end_sched].tag) ;
-	LIBRETRO_S(sch_list[render_end_sched].start) ;
-	LIBRETRO_S(sch_list[render_end_sched].end) ;
+	LIBRETRO_S(sch_list[render_end_schid].tag) ;
+	LIBRETRO_S(sch_list[render_end_schid].start) ;
+	LIBRETRO_S(sch_list[render_end_schid].end) ;
 
-	LIBRETRO_S(sch_list[vblank_sched].tag) ;
-	LIBRETRO_S(sch_list[vblank_sched].start) ;
-	LIBRETRO_S(sch_list[vblank_sched].end) ;
+	LIBRETRO_S(sch_list[vblank_schid].tag) ;
+	LIBRETRO_S(sch_list[vblank_schid].start) ;
+	LIBRETRO_S(sch_list[vblank_schid].end) ;
 
-#ifdef HAVE_MODEM
-   LIBRETRO_S(sch_list[modem_sched].tag) ;
-   LIBRETRO_S(sch_list[modem_sched].start) ;
-   LIBRETRO_S(sch_list[modem_sched].end) ;
+   LIBRETRO_S(settings.network.EmulateBBA);
+#ifdef ENABLE_MODEM
+   if (settings.network.EmulateBBA)
+   {
+      bba_Serialize(data, total_size);
+   }
+   else
+   {
+      LIBRETRO_S(sch_list[modem_sched].tag) ;
+      LIBRETRO_S(sch_list[modem_sched].start) ;
+      LIBRETRO_S(sch_list[modem_sched].end) ;
+   }
 #else
    LIBRETRO_S(i);
    LIBRETRO_S(i);
@@ -581,6 +595,7 @@ bool dc_serialize(void **data, unsigned int *total_size)
 	if (CurrentCartridge != NULL)
 	   CurrentCartridge->Serialize(data, total_size);
 	gd_hle_state.Serialize(data, total_size);
+   settings.network.EmulateBBA = false;
 
 	return true ;
 }
@@ -763,6 +778,7 @@ bool dc_unserialize(void **data, unsigned int *total_size, size_t actual_data_si
 
 	LIBRETRO_US(in_vblank);
 	LIBRETRO_US(clc_pvr_scanline);
+   fb_w_cur = 1;
 	if (version < V9)
 	{
 		LIBRETRO_US(i); 			// pvr_numscanlines
@@ -772,8 +788,8 @@ bool dc_unserialize(void **data, unsigned int *total_size, size_t actual_data_si
 		LIBRETRO_US(i); 			// Frame_Cycles
 		if (version < V3)
 		{
-			LIBRETRO_US(dummy_int);	//render_end_sched
-			LIBRETRO_US(dummy_int);	//vblank_sched
+			LIBRETRO_US(dummy_int);	//render_end_schid
+			LIBRETRO_US(dummy_int);	//vblank_schid
 			LIBRETRO_US(dummy_int);	//time_sync
 		}
 		LIBRETRO_SKIP(8); 		// speed_load_mspdf
@@ -783,6 +799,10 @@ bool dc_unserialize(void **data, unsigned int *total_size, size_t actual_data_si
 		LIBRETRO_SKIP(4 * 256); // ta_type_lut
 		LIBRETRO_SKIP(2048); // ta_fsm
 	}
+   if (version >= V12)
+		LIBRETRO_US(fb_w_cur);
+	else
+		fb_w_cur = 1;
 	LIBRETRO_US(ta_fsm[2048]);
 	LIBRETRO_US(ta_fsm_cl);
 
@@ -811,7 +831,7 @@ bool dc_unserialize(void **data, unsigned int *total_size, size_t actual_data_si
 	KillTex = true;
 	pal_needs_update = true;
 	if (version >= V10)
-		UnserializeTAContext(data, total_size);
+		UnserializeTAContext(data, total_size, VCUR_LIBRETRO);
 
 	LIBRETRO_USA(vram.data, vram.size);
 
@@ -827,6 +847,14 @@ bool dc_unserialize(void **data, unsigned int *total_size, size_t actual_data_si
 	register_unserialize(TMU, data, total_size) ;
 	register_unserialize(SCI, data, total_size) ;
 	register_unserialize(SCIF, data, total_size) ;
+	if (version >= V9)
+		icache.Unserialize(data, total_size);
+	else
+		icache.Reset(true);
+	if (version >= V10)
+		ocache.Unserialize(data, total_size);
+	else
+		ocache.Reset(true);
 
 	LIBRETRO_USA(mem_b.data, mem_b.size);
 
@@ -897,13 +925,13 @@ bool dc_unserialize(void **data, unsigned int *total_size, size_t actual_data_si
 	   LIBRETRO_US(sch_list[tmu_sched[i]].end) ;
 	}
 
-	LIBRETRO_US(sch_list[render_end_sched].tag) ;
-	LIBRETRO_US(sch_list[render_end_sched].start) ;
-	LIBRETRO_US(sch_list[render_end_sched].end) ;
+	LIBRETRO_US(sch_list[render_end_schid].tag) ;
+	LIBRETRO_US(sch_list[render_end_schid].start) ;
+	LIBRETRO_US(sch_list[render_end_schid].end) ;
 
-	LIBRETRO_US(sch_list[vblank_sched].tag) ;
-	LIBRETRO_US(sch_list[vblank_sched].start) ;
-	LIBRETRO_US(sch_list[vblank_sched].end) ;
+	LIBRETRO_US(sch_list[vblank_schid].tag) ;
+	LIBRETRO_US(sch_list[vblank_schid].start) ;
+	LIBRETRO_US(sch_list[vblank_schid].end) ;
 
 	if (version < V9)
 	{
@@ -912,12 +940,24 @@ bool dc_unserialize(void **data, unsigned int *total_size, size_t actual_data_si
 		LIBRETRO_US(dummy_int); // sch_list[time_sync].end
 	}
 
+   if (version >= V13)
+		LIBRETRO_US(settings.network.EmulateBBA);
+	else
+		settings.network.EmulateBBA = false;
+
 	if ( version >= V2 )
 	{
-#ifdef HAVE_MODEM
-		LIBRETRO_US(sch_list[modem_sched].tag) ;
-		LIBRETRO_US(sch_list[modem_sched].start) ;
-		LIBRETRO_US(sch_list[modem_sched].end) ;
+#ifdef ENABLE_MODEM
+      if (settings.network.EmulateBBA)
+      {
+         bba_Unserialize(data, total_size);
+      }
+      else
+      {
+         LIBRETRO_US(sch_list[modem_sched].tag) ;
+         LIBRETRO_US(sch_list[modem_sched].start) ;
+         LIBRETRO_US(sch_list[modem_sched].end) ;
+      }
 #else
 		LIBRETRO_US(dummy_int);
 		LIBRETRO_US(dummy_int);

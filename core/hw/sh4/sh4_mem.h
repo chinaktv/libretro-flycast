@@ -18,6 +18,10 @@ extern VArray2 mem_b;
 #define WriteMem16 _vmem_WriteMem16
 #define WriteMem32 _vmem_WriteMem32
 #define WriteMem64 _vmem_WriteMem64
+#ifdef STRICT_MODE
+#error Strict mode requires the MMU
+#endif
+
 #else
 typedef u8 DYNACALL (*ReadMem8Func)(u32 addr);
 typedef u16 DYNACALL (*ReadMem16Func)(u32 addr);
@@ -58,16 +62,21 @@ void WriteMemBlock_nommu_dma(u32 dst,u32 src,u32 size);
 //Init/Res/Term
 void mem_Init();
 void mem_Term();
-void mem_Reset(bool Manual);
+void mem_Reset(bool hard);
 void mem_map_default();
 
 //Get pointer to ram area , 0 if error
 //For debugger(gdb) - dynarec
 u8* GetMemPtr(u32 Addr,u32 size);
 
-bool IsOnRam(u32 addr);
+static inline bool IsOnRam(u32 addr)
+{
+	// in area 3 but not in P4
+	return ((addr >> 26) & 7) == 3 && ((addr >> 29) & 7) != 7;
+}
 
-bool LoadRomFiles(const string& root);
-void SaveRomFiles(const string& root);
-bool LoadHle(const string& root);
+bool LoadRomFiles(const std::string& root);
+void SaveRomFiles(const std::string& root);
+bool LoadHle(const std::string& root);
 void FixUpFlash();
+void SetMemoryHandlers();

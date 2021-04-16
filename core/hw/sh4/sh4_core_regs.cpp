@@ -13,17 +13,24 @@ u8* sh4_dyna_rcb;
 
 static INLINE void ChangeGPR()
 {
+#ifdef HAVE_MODERN_CXX
+   std::swap((u32 (&)[8])r, r_bank);
+#else
 	u32 temp;
 	for (int i=0;i<8;i++)
 	{
-		temp=r[i];
-		r[i]=r_bank[i];
-		r_bank[i]=temp;
+		temp      = r[i];
+		r[i]      = r_bank[i];
+		r_bank[i] = temp;
 	}
+#endif
 }
 
 static INLINE void ChangeFP()
 {
+#ifdef HAVE_MODERN_CXX
+   std::swap((f32 (&)[16])Sh4cntx.xffr, *(f32 (*)[16])&Sh4cntx.xffr[16]);
+#else
 	u32 temp;
 	for (int i=0;i<16;i++)
 	{
@@ -31,6 +38,7 @@ static INLINE void ChangeFP()
 		fr_hex[i]=xf_hex[i];
 		xf_hex[i]=temp;
 	}
+#endif
 }
 
 //called when sr is changed and we must check for reg banks etc.
@@ -39,13 +47,13 @@ bool UpdateSR()
 {
 	if (sr.MD)
 	{
-		if (old_sr.RB !=sr.RB)
+		if (old_sr.RB != sr.RB)
 			ChangeGPR();//bank change
 	}
 	else
 	{
-      if (old_sr.RB)
-         ChangeGPR();//switch
+		if (old_sr.RB)
+			ChangeGPR();//switch
 	}
 
 	old_sr.status=sr.status;
@@ -54,11 +62,11 @@ bool UpdateSR()
 	return SRdecode();
 }
 
-//make host and sh4 float status registers match ;)
-u32 old_rm=0xFF;
-u32 old_dn=0xFF;
+//make host and sh4 rounding and denormal modes match
+static u32 old_rm = 0xFF;
+static u32 old_dn = 0xFF;
 
-static void SetFloatStatusReg()
+static void setHostRoundingMode()
 {
 	if ((old_rm!=fpscr.RM) || (old_dn!=fpscr.DN))
 	{
@@ -142,10 +150,16 @@ void UpdateFPSCR()
 	if (fpscr.FR !=old_fpscr.FR)
 		ChangeFP(); // FPU bank change
 
-	old_fpscr=fpscr;
-	SetFloatStatusReg(); // Ensure they are in sync :)
+   old_fpscr=fpscr;
+   setHostRoundingMode();
 }
 
+void RestoreHostRoundingMode()
+{
+	old_rm = 0xFF;
+	old_dn = 0xFF;
+	setHostRoundingMode();
+}
 
 static u32* Sh4_int_GetRegisterPtr(Sh4RegType reg)
 {

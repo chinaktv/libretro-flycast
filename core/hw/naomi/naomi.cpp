@@ -10,8 +10,11 @@
 #include "naomi.h"
 #include "naomi_cart.h"
 #include "naomi_regs.h"
+#include "naomi_m3comm.h"
 
 //#define NAOMI_COMM
+
+static NaomiM3Comm m3comm;
 
 static const u32 BoardID=0x980055AA;
 u32 GSerialBuffer=0,BSerialBuffer=0;
@@ -392,25 +395,31 @@ void naomi_process(u32 command, u32 offsetl, u32 parameterl, u32 parameterh)
 	}
 }
 
-u32 ReadMem_naomi(u32 Addr, u32 sz)
+u32 ReadMem_naomi(u32 address, u32 size)
 {
-	verify(sz!=1);
+	verify(size!=1);
 	if (unlikely(CurrentCartridge == NULL))
 	{
 		INFO_LOG(NAOMI, "called without cartridge");
 		return 0xFFFF;
 	}
-	return CurrentCartridge->ReadMem(Addr, sz);
+	if (address >= NAOMI_COMM2_CTRL_addr && address <= NAOMI_COMM2_STATUS1_addr)
+		return m3comm.ReadMem(address, size);
+	else
+		return CurrentCartridge->ReadMem(address, size);
 }
 
-void WriteMem_naomi(u32 Addr, u32 data, u32 sz)
+void WriteMem_naomi(u32 address, u32 data, u32 size)
 {
 	if (unlikely(CurrentCartridge == NULL))
 	{
 		INFO_LOG(NAOMI, "called without cartridge");
 		return;
 	}
-	CurrentCartridge->WriteMem(Addr, data, sz);
+	if (address >= NAOMI_COMM2_CTRL_addr && address <= NAOMI_COMM2_STATUS1_addr && settings.System == DC_PLATFORM_NAOMI)
+		m3comm.WriteMem(address, data, size);
+	else
+		CurrentCartridge->WriteMem(address, data, size);
 }
 
 //Dma Start
@@ -422,42 +431,42 @@ void Naomi_DmaStart(u32 addr, u32 data)
 		return;
 	}
 	
-	SB_GDST|=data&1;
+	SB_GDST |= data & 1;
 
-	if (SB_GDST==1)
+	if (SB_GDST == 0)
+		return;
+
+	if (!m3comm.DmaStart(addr, data) && CurrentCartridge != NULL)
 	{
-		verify(1 == SB_GDDIR );
 		DEBUG_LOG(NAOMI, "NAOMI-DMA start addr %08X len %d", SB_GDSTAR, SB_GDLEN);
-	
-		SB_GDSTARD = SB_GDSTAR + SB_GDLEN;
-		
-		SB_GDLEND = SB_GDLEN;
-		SB_GDST = 0;
-		if (CurrentCartridge != NULL)
+		verify(1 == SB_GDDIR);
+		u32 start = SB_GDSTAR & 0x1FFFFFE0;
+		u32 len = (SB_GDLEN + 31) & ~31;
+		SB_GDLEND = 0;
+		while (len > 0)
 		{
-			u32 len = (SB_GDLEN + 30) & ~30;
-			u32 offset = 0;
-			while (len > 0)
+			u32 block_len = len;
+			void* ptr = CurrentCartridge->GetDmaPtr(block_len);
+			if (block_len == 0)
 			{
-				u32 block_len = len;
-				void* ptr = CurrentCartridge->GetDmaPtr(block_len);
-				if (block_len == 0)
-				{
-					// empty or end of cart?
-					INFO_LOG(NAOMI, "Aborted DMA transfer. Read past end of cart?");
-					SB_GDLEND -= len;
-					SB_GDSTARD -= len;
-					break;
-				}
-				WriteMemBlock_nommu_ptr(SB_GDSTAR + offset, (u32*)ptr, block_len);
-				CurrentCartridge->AdvancePtr(block_len);
-				len -= block_len;
-				offset += block_len;
+				INFO_LOG(NAOMI, "Aborted DMA transfer. Read past end of cart?");
+				break;
 			}
+			WriteMemBlock_nommu_ptr(start, (u32*)ptr, block_len);
+			CurrentCartridge->AdvancePtr(block_len);
+			len -= block_len;
+			start += block_len;
+			SB_GDLEND += block_len;
 		}
-
-		asic_RaiseInterrupt(holly_GDROM_DMA);
+		SB_GDSTARD = start;
 	}
+	else
+	{
+		SB_GDSTARD = SB_GDSTAR + SB_GDLEN;
+		SB_GDLEND = SB_GDLEN;
+	}
+	SB_GDST = 0;
+	asic_RaiseInterrupt(holly_GDROM_DMA);
 }
 
 
@@ -526,7 +535,7 @@ void naomi_reg_Init()
 
 void naomi_reg_Term()
 {
-	#ifdef NAOMI_COMM
+#ifdef NAOMI_COMM
 	if (CommSharedMem)
 	{
 		UnmapViewOfFile(CommSharedMem);
@@ -535,9 +544,11 @@ void naomi_reg_Term()
 	{
 		CloseHandle(CommMapFile);
 	}
-	#endif
+#endif
+	m3comm.closeNetwork();
 }
-void naomi_reg_Reset(bool Manual)
+
+void naomi_reg_Reset(bool hard)
 {
 	SB_GDST = 0;
 	SB_GDEN = 0;
@@ -564,6 +575,7 @@ void naomi_reg_Reset(bool Manual)
 	reg_dimm_parameterl = 0;
 	reg_dimm_parameterh = 0;
 	reg_dimm_status = 0x11;
+	m3comm.closeNetwork();
 }
 
 static u8 aw_maple_devs;

@@ -16,6 +16,7 @@
 #include "../modules/ccn.h"
 #include "../sh4_interrupts.h"
 #include "hw/gdrom/gdrom_if.h"
+#include "../sh4_cache.h"
 
 #include "hw/sh4/sh4_opcode.h"
 
@@ -1168,19 +1169,25 @@ sh4op(i0000_0000_0011_1000)
 //ocbi @<REG_N>
 sh4op(i0000_nnnn_1001_0011)
 {
-	//printf("ocbi @0x%08X \n",r[n]);
+#ifdef STRICT_MODE
+	ocache.WriteBack(r[GetN(op)], false, true);
+#endif
 }
 
 //ocbp @<REG_N>
 sh4op(i0000_nnnn_1010_0011)
 {
-	//printf("ocbp @0x%08X \n",r[n]);
+#ifdef STRICT_MODE
+	ocache.WriteBack(r[GetN(op)], true, true);
+#endif
 }
 
 //ocbwb @<REG_N>
 sh4op(i0000_nnnn_1011_0011)
 {
-	//printf("ocbwb @0x%08X \n",r[n]);
+#ifdef STRICT_MODE
+	ocache.WriteBack(r[GetN(op)], true, false);
+#endif
 }
 
 //pref @<REG_N>
@@ -1257,6 +1264,12 @@ sh4op(i0000_nnnn_1000_0011)
 			do_sqw<true>(Dest);
 		else
 			do_sqw<false>(Dest);
+	}
+	else
+	{
+#ifdef STRICT_MODE
+		ocache.Prefetch(Dest);
+#endif
 	}
 }
 

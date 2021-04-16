@@ -80,7 +80,7 @@ void TextureCacheData::UploadToGPU(int width, int height, u8 *temp_tex_buffer, b
 				mipmapLevels++;
 				dim >>= 1;
 			}
-#if !defined(HAVE_OPENGLES2) && HOST_OS != OS_DARWIN
+#if !defined(HAVE_OPENGLES2) && !defined(__APPLE__)
 			// Open GL 4.2 or GLES 3.0 min
 			if (gl.gl_major > 4 || (gl.gl_major == 4 && gl.gl_minor >= 2)
 					|| (gl.is_gles && gl.gl_major >= 3))
@@ -175,15 +175,6 @@ bool TextureCacheData::Delete()
 {
 	if (!BaseTextureCacheData::Delete())
 		return false;
-
-	if (pData) {
-		#if FEAT_HAS_SOFTREND
-			_mm_free(pData);
-			pData = 0;
-		#else
-			die("softrend disabled, invalid codepath");
-		#endif
-	}
 
 	if (texID) {
 		glcache.DeleteTextures(1, &texID);
@@ -352,8 +343,7 @@ void ReadRTTBuffer() {
     		texture_data->Create();
     	texture_data->texID = gl.rtt.tex;
     	texture_data->dirty = 0;
-    	if (texture_data->lock_block == NULL)
-    		texture_data->lock_block = libCore_vramlock_Lock(texture_data->sa_tex, texture_data->sa + texture_data->size - 1, texture_data);
+      libCore_vramlock_Lock(texture_data->sa_tex, texture_data->sa + texture_data->size - 1, texture_data);
     }
     gl.rtt.tex = 0;
 
@@ -397,30 +387,6 @@ u64 gl_GetTexture(TSP tsp, TCW tcw)
 
 	// Return gl texture
 	return tf->texID;
-}
-
-text_info raw_GetTexture(TSP tsp, TCW tcw)
-{
-	text_info rv = { 0 };
-
-	//lookup texture
-	TextureCacheData* tf = TexCache.getTextureCacheData(tsp, tcw);
-
-	if (tf->pData == nullptr)
-		tf->Create();
-
-	//update if needed
-	if (tf->NeedsUpdate())
-		tf->Update();
-
-	//return gl texture
-	rv.height = tf->h;
-	rv.width = tf->w;
-	rv.pdata = tf->pData;
-	rv.textype = (u32)tf->tex_type;
-	
-	
-	return rv;
 }
 
 

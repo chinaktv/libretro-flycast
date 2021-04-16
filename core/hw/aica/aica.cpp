@@ -88,7 +88,7 @@ const int AICA_TICK = 145125;	// 44.1 KHz / 32
 
 static int AicaUpdate(int tag, int c, int j)
 {
-	arm_Run(32);
+   aicaarm::run(32);
 	if (!settings.aica.NoBatch && !settings.aica.DSPEnabled)
 		AICA_Sample32();
 
@@ -209,28 +209,28 @@ void WriteAicaReg(u32 reg,u32 data)
 		break;
 
 	case TIMER_A:
-		WriteMemArr(aica_reg,reg,data,sz);
+		WriteMemArr<sz>(aica_reg, reg, data);
 		timers[0].RegisterWrite();
 		break;
 
 	case TIMER_B:
-		WriteMemArr(aica_reg,reg,data,sz);
+		WriteMemArr<sz>(aica_reg, reg, data);
 		timers[1].RegisterWrite();
 		break;
 
 	case TIMER_C:
-		WriteMemArr(aica_reg,reg,data,sz);
+		WriteMemArr<sz>(aica_reg, reg, data);
 		timers[2].RegisterWrite();
 		break;
 
 	// DEXE, DDIR, DLG
 	case 0x288C:
-		WriteMemArr(aica_reg, reg, data, sz);
+		WriteMemArr<sz>(aica_reg, reg, data);
 		AicaInternalDMA();
 		break;
 
 	default:
-		WriteMemArr(aica_reg,reg,data,sz);
+		WriteMemArr<sz>(aica_reg, reg, data);
 		break;
 	}
 }
@@ -271,16 +271,16 @@ s32 libAICA_Init()
 	return 0;
 }
 
-void libAICA_Reset(bool manual)
+void libAICA_Reset(bool hard)
 {
-	if (!manual)
+	if (hard)
 	{
 		init_mem();
 		sgc_Init();
-	}	
+	}
 	for (u32 i = 0; i < 3; i++)
 		timers[i].Init(aica_reg, i);
-	aica_Reset(manual);
+	aica_Reset(hard);
 }
 
 void libAICA_Term()

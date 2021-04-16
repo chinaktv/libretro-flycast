@@ -68,7 +68,6 @@ static void (*mainloop)(void *context);
 static int (*arm64_intc_sched)();
 static void (*arm64_no_update)();
 
-void(*ngen_FailedToFindBlock)();
 static bool restarting;
 
 void ngen_mainloop(void* v_cntx)
@@ -83,13 +82,13 @@ void ngen_mainloop(void* v_cntx)
 	} while (restarting);
 }
 
-void ngen_init_arm64()
+void ngen_init()
 {
 	INFO_LOG(DYNAREC, "Initializing the ARM64 dynarec");
 	ngen_FailedToFindBlock = &ngen_FailedToFindBlock_nommu;
 }
 
-void ngen_ResetBlocks_arm64()
+void ngen_ResetBlocks()
 {
 	mainloop = NULL;
 	if (mmu_enabled())
@@ -102,6 +101,12 @@ void ngen_ResetBlocks_arm64()
 		p_sh4rcb->cntx.CpuRunning = 0;
 		restarting = true;
 	}
+}
+
+void ngen_GetFeatures(ngen_features* dst)
+{
+	dst->InterpreterFallback = false;
+	dst->OnlyDynamicEnds     = false;
 }
 
 template<typename T>
@@ -1251,9 +1256,7 @@ public:
 			if (!mmu_enabled())
 			{
 				// TODO Call no_update instead (and check CpuRunning less frequently?)
-				Mov(x2, sizeof(Sh4RCB));
-				Sub(x2, x28, x2);
-				Add(x2, x2, sizeof(Sh4Context));		// x2 now points to FPCB
+            Sub(x2, x28, offsetof(Sh4RCB, cntx));
 #if RAM_SIZE_MAX == 33554432
 				Ubfx(w1, w29, 1, 24);
 #else
@@ -1341,6 +1344,7 @@ public:
 
 		// int intc_sched()
 		arm64_intc_sched = GetCursorAddress<int (*)()>();
+      verify((void *)arm64_intc_sched == (void *)CodeCache);
 		B(&intc_sched);
 
 		// void no_update()
@@ -1553,7 +1557,7 @@ private:
 		u32 size = op.flags & 0x7f;
 		u32 addr = op.rs1._imm;
 #ifndef NO_MMU
-		if (mmu_enabled())
+      if (mmu_enabled() && mmu_is_translated<MMU_TT_DREAD>(addr, size))
 		{
 			if ((addr >> 12) != (block->vaddr >> 12))
 				// When full mmu is on, only consider addresses in the same 4k page
@@ -1776,7 +1780,7 @@ private:
 		u32 size = op.flags & 0x7f;
 		u32 addr = op.rs1._imm;
 #ifndef NO_MMU
-		if (mmu_enabled())
+      if (mmu_enabled() && mmu_is_translated<MMU_TT_DWRITE>(addr, size))
 		{
 			if ((addr >> 12) != (block->vaddr >> 12) && ((addr >> 12) != ((block->vaddr + block->guest_opcodes * 2 - 1) >> 12)))
 				// When full mmu is on, only consider addresses in the same 4k page
@@ -2105,7 +2109,7 @@ private:
 
 static Arm64Assembler* compiler;
 
-void ngen_Compile_arm64(RuntimeBlockInfo* block, bool force_checks, bool reset, bool staging, bool optimise)
+void ngen_Compile(RuntimeBlockInfo* block, bool force_checks, bool reset, bool staging, bool optimise)
 {
 	verify(emit_FreeSpace() >= 16 * 1024);
 
@@ -2117,22 +2121,22 @@ void ngen_Compile_arm64(RuntimeBlockInfo* block, bool force_checks, bool reset, 
 	compiler = NULL;
 }
 
-void ngen_CC_Start_arm64(shil_opcode* op)
+void ngen_CC_Start(shil_opcode* op)
 {
 	compiler->ngen_CC_Start(op);
 }
 
-void ngen_CC_Param_arm64(shil_opcode* op, shil_param* par, CanonicalParamType tp)
+void ngen_CC_Param(shil_opcode* op, shil_param* par, CanonicalParamType tp)
 {
 	compiler->ngen_CC_Param(*op, *par, tp);
 }
 
-void ngen_CC_Call_arm64(shil_opcode*op, void* function)
+void ngen_CC_Call(shil_opcode*op, void* function)
 {
 	compiler->ngen_CC_Call(op, function);
 }
 
-void ngen_CC_Finish_arm64(shil_opcode* op)
+void ngen_CC_Finish(shil_opcode* op)
 {
 
 }
@@ -2206,14 +2210,14 @@ bool ngen_Rewrite(unat& host_pc, unat, unat)
 
 static void generate_mainloop()
 {
-	if (mainloop != NULL)
+	if (mainloop != nullptr)
 		return;
 	compiler = new Arm64Assembler();
 
 	compiler->GenMainloop();
 
 	delete compiler;
-	compiler = NULL;
+	compiler = nullptr;
 }
 
 RuntimeBlockInfo* ngen_AllocateBlock()

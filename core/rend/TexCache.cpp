@@ -29,6 +29,7 @@ bool palette_updated;
 const std::array<f32, 16> D_Adjust_LoD_Bias = {
 		0.f, -4.f, -2.f, -1.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f
 };
+static void rend_text_invl(vram_block* bl);
 
 u32 detwiddle[2][11][1024];
 //input : address in the yyyyyxxxxx format
@@ -174,7 +175,7 @@ void vramlock_list_add(vram_block* block)
  
 cMutex vramlist_lock;
 
-vram_block* libCore_vramlock_Lock(u32 start_offset64,u32 end_offset64,void* userdata)
+void libCore_vramlock_Lock(u32 start_offset64, u32 end_offset64, BaseTextureCacheData *texture)
 {
 	vram_block* block=(vram_block* )malloc(sizeof(vram_block));
  
@@ -195,17 +196,22 @@ vram_block* libCore_vramlock_Lock(u32 start_offset64,u32 end_offset64,void* user
 	block->end=end_offset64;
 	block->start=start_offset64;
 	block->len=end_offset64-start_offset64+1;
-	block->userdata=userdata;
+	block->userdata = texture;
 	block->type=64;
 
 	{
 		std::lock_guard<cMutex> lock(vramlist_lock);
 
-		// This also protects vram if needed
-		vramlock_list_add(block);
-	}
+      if (texture->lock_block == nullptr)
+      {
+         // This also protects vram if needed
+         vramlock_list_add(block);
+         texture->lock_block = block;
+      }
+      else
+         free(block);
 
-	return block;
+	}
 }
 
 bool VramLockedWriteOffset(size_t offset)
@@ -217,13 +223,13 @@ bool VramLockedWriteOffset(size_t offset)
 	std::vector<vram_block *>& list = VramLocks[addr_hash];
 
 	{
-		std::lock_guard<cMutex> lock(vramlist_lock);
+		std::lock_guard<cMutex> lockguard(vramlist_lock);
 
 		for (auto& lock : list)
 		{
 			if (lock != nullptr)
 			{
-				libPvr_LockedBlockWrite(lock, (u32)offset);
+            rend_text_invl(lock);
 
 				if (lock != nullptr)
 				{
@@ -265,71 +271,6 @@ void libCore_vramlock_Unlock_block(vram_block* block)
 }
 
 #ifdef HAVE_TEXUPSCALE
-//
-// deposterization: smoothes posterized gradients from low-color-depth (e.g. 444, 565, compressed) sources
-// Shamelessly stolen from ppsspp
-// Copyright (c) 2012- PPSSPP Project.
-//
-#define BLOCK_SIZE 32
-
-static void deposterizeH(u32* data, u32* out, int w, int l, int u) {
-	static const int T = 8;
-	for (int y = l; y < u; ++y) {
-		for (int x = 0; x < w; ++x) {
-			int inpos = y*w + x;
-			u32 center = data[inpos];
-			if (x == 0 || x == w - 1) {
-				out[y*w + x] = center;
-				continue;
-			}
-			u32 left = data[inpos - 1];
-			u32 right = data[inpos + 1];
-			out[y*w + x] = 0;
-			for (int c = 0; c < 4; ++c) {
-				u8 lc = ((left >> c * 8) & 0xFF);
-				u8 cc = ((center >> c * 8) & 0xFF);
-				u8 rc = ((right >> c * 8) & 0xFF);
-				if ((lc != rc) && ((lc == cc && abs((int)((int)rc) - cc) <= T) || (rc == cc && abs((int)((int)lc) - cc) <= T))) {
-					// blend this component
-					out[y*w + x] |= ((rc + lc) / 2) << (c * 8);
-				} else {
-					// no change for this component
-					out[y*w + x] |= cc << (c * 8);
-				}
-			}
-		}
-	}
-}
-static void deposterizeV(u32* data, u32* out, int w, int h, int l, int u) {
-	static const int T = 8;
-	for (int xb = 0; xb < w / BLOCK_SIZE + 1; ++xb) {
-		for (int y = l; y < u; ++y) {
-			for (int x = xb*BLOCK_SIZE; x < (xb + 1)*BLOCK_SIZE && x < w; ++x) {
-				u32 center = data[y    * w + x];
-				if (y == 0 || y == h - 1) {
-					out[y*w + x] = center;
-					continue;
-				}
-				u32 upper = data[(y - 1) * w + x];
-				u32 lower = data[(y + 1) * w + x];
-				out[y*w + x] = 0;
-				for (int c = 0; c < 4; ++c) {
-					u8 uc = ((upper >> c * 8) & 0xFF);
-					u8 cc = ((center >> c * 8) & 0xFF);
-					u8 lc = ((lower >> c * 8) & 0xFF);
-					if ((uc != lc) && ((uc == cc && abs((int)((int)lc) - cc) <= T) || (lc == cc && abs((int)((int)uc) - cc) <= T))) {
-						// blend this component
-						out[y*w + x] |= ((lc + uc) / 2) << (c * 8);
-					} else {
-						// no change for this component
-						out[y*w + x] |= cc << (c * 8);
-					}
-				}
-			}
-		}
-	}
-}
-
 #ifndef TARGET_NO_OPENMP
 static inline int getThreadCount()
 {
@@ -354,16 +295,6 @@ void parallelize(Func func, int start, int end)
 	}
 }
 
-void DePosterize(u32* source, u32* dest, int width, int height) {
-	u32 *tmpbuf = (u32 *)malloc(width * height * sizeof(u32));
-
-	parallelize([source, tmpbuf, width](int start, int end) { deposterizeH(source, tmpbuf, width, start, end); }, 0, height);
-	parallelize([tmpbuf, dest, width, height](int start, int end) { deposterizeV(tmpbuf, dest, width, height, start, end); }, 0, height);
-	parallelize([dest, tmpbuf, width](int start, int end) { deposterizeH(dest, tmpbuf, width, start, end); }, 0, height);
-	parallelize([tmpbuf, dest, width, height](int start, int end) { deposterizeV(tmpbuf, dest, width, height, start, end); }, 0, height);
-
-	free(tmpbuf);
-}
 #endif
 
 static struct xbrz::ScalerCfg xbrz_cfg;
@@ -489,7 +420,6 @@ bool BaseTextureCacheData::Delete()
 	if (custom_load_in_progress > 0)
 		return false;
 
-	if (lock_block)
 	{
 		std::lock_guard<cMutex> lock(vramlist_lock);
 		if (lock_block)
@@ -497,7 +427,7 @@ bool BaseTextureCacheData::Delete()
 		lock_block = nullptr;
 	}
 
-	delete[] custom_image_data;
+	free(custom_image_data);
 
 	return true;
 }
@@ -716,17 +646,6 @@ void BaseTextureCacheData::Update()
 
 			texconv32(&pb32, (u8*)&vram[sa], stride, h);
 
-#ifdef DEPOSTERIZE
-			{
-				// Deposterization
-				PixelBuffer<u32> tmp_buf;
-				tmp_buf.init(w, h);
-
-				DePosterize(pb32.data(), tmp_buf.data(), w, h);
-				pb32.steal_data(tmp_buf);
-			}
-#endif
-
 #ifdef HAVE_TEXUPSCALE
 			// xBRZ scaling
 			if (textureUpscaling)
@@ -813,10 +732,9 @@ void BaseTextureCacheData::Update()
 	h = original_h;
 
 	//lock the texture to detect changes in it
-	if (lock_block == nullptr)
-		lock_block = libCore_vramlock_Lock(sa_tex,sa+size-1,this);
+   libCore_vramlock_Lock(sa_tex, sa + size - 1, this);
 
-	UploadToGPU(upscaled_w, upscaled_h, (u8*)temp_tex_buffer, mipmapped, mipmapped);
+	UploadToGPU(upscaled_w, upscaled_h, (u8*)temp_tex_buffer, IsMipmapped(), mipmapped);
 	if (settings.rend.DumpTextures)
 	{
 		ComputeHash();
@@ -832,7 +750,7 @@ void BaseTextureCacheData::CheckCustomTexture()
 	{
 		tex_type = TextureType::_8888;
 		UploadToGPU(custom_width, custom_height, custom_image_data, IsMipmapped(), false);
-		delete [] custom_image_data;
+		free(custom_image_data);
 		custom_image_data = NULL;
 	}
 }
@@ -866,7 +784,21 @@ void ReadFramebuffer(PixelBuffer<u32>& pb, int& width, int& height)
 			break;
 	}
 
-	u32 addr = SPG_CONTROL.interlace && !SPG_STATUS.fieldnum ? FB_R_SOF2 : FB_R_SOF1;
+   u32 addr = FB_R_SOF1;
+	if (SPG_CONTROL.interlace)
+	{
+		if (width == modulus && FB_R_SOF2 == FB_R_SOF1 + width * bpp)
+		{
+			// Typical case alternating even and odd lines -> take the whole buffer at once
+			modulus = 0;
+			height *= 2;
+		}
+		else
+		{
+			addr = SPG_STATUS.fieldnum ? FB_R_SOF2 : FB_R_SOF1;
+		}
+	}
+
 
 	pb.init(width, height);
 	u8 *dst = (u8*)pb.data();
@@ -878,7 +810,7 @@ void ReadFramebuffer(PixelBuffer<u32>& pb, int& width, int& height)
 			{
 				for (int i = 0; i < width; i++)
 				{
-					u16 src = pvr_read_area1_16(addr);
+					u16 src = pvr_read_area1<u16>(addr);
 					*dst++ = (((src >> 10) & 0x1F) << 3) + FB_R_CTRL.fb_concat;
 					*dst++ = (((src >> 5) & 0x1F) << 3) + FB_R_CTRL.fb_concat;
 					*dst++ = (((src >> 0) & 0x1F) << 3) + FB_R_CTRL.fb_concat;
@@ -894,7 +826,7 @@ void ReadFramebuffer(PixelBuffer<u32>& pb, int& width, int& height)
 			{
 				for (int i = 0; i < width; i++)
 				{
-					u16 src = pvr_read_area1_16(addr);
+					u16 src = pvr_read_area1<u16>(addr);
 					*dst++ = (((src >> 11) & 0x1F) << 3) + FB_R_CTRL.fb_concat;
 					*dst++ = (((src >> 5) & 0x3F) << 2) + (FB_R_CTRL.fb_concat & 3);
 					*dst++ = (((src >> 0) & 0x1F) << 3) + FB_R_CTRL.fb_concat;
@@ -909,7 +841,7 @@ void ReadFramebuffer(PixelBuffer<u32>& pb, int& width, int& height)
 			{
 				for (int i = 0; i < width; i += 4)
 				{
-					u32 src = pvr_read_area1_32(addr);
+					u32 src = pvr_read_area1<u32>(addr);
 					*dst++ = src >> 16;
 					*dst++ = src >> 8;
 					*dst++ = src;
@@ -917,7 +849,7 @@ void ReadFramebuffer(PixelBuffer<u32>& pb, int& width, int& height)
 					addr += 4;
 					if (i + 1 >= width)
 						break;
-					u32 src2 = pvr_read_area1_32(addr);
+					u32 src2 = pvr_read_area1<u32>(addr);
 					*dst++ = src2 >> 8;
 					*dst++ = src2;
 					*dst++ = src >> 24;
@@ -925,7 +857,7 @@ void ReadFramebuffer(PixelBuffer<u32>& pb, int& width, int& height)
 					addr += 4;
 					if (i + 2 >= width)
 						break;
-					u32 src3 = pvr_read_area1_32(addr);
+					u32 src3 = pvr_read_area1<u32>(addr);
 					*dst++ = src3;
 					*dst++ = src2 >> 24;
 					*dst++ = src2 >> 16;
@@ -946,7 +878,7 @@ void ReadFramebuffer(PixelBuffer<u32>& pb, int& width, int& height)
 			{
 				for (int i = 0; i < width; i++)
 				{
-					u32 src = pvr_read_area1_32(addr);
+					u32 src = pvr_read_area1<u32>(addr);
 					*dst++ = src >> 16;
 					*dst++ = src >> 8;
 					*dst++ = src;
@@ -1006,7 +938,7 @@ void WriteTextureToVRam(u32 width, u32 height, u8 *data, u16 *dst)
 	}
 }
 
-void rend_text_invl(vram_block* bl)
+static void rend_text_invl(vram_block* bl)
 {
 	BaseTextureCacheData* tcd = (BaseTextureCacheData*)bl->userdata;
 	tcd->dirty = FrameCount;

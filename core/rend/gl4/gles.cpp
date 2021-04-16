@@ -46,9 +46,7 @@ void main()
 	vtx_base1 = in_base1;
 	vtx_offs1 = in_offs1;
 	vtx_uv1 = in_uv1;
-	vec4 vpos = in_pos;
-	
-	vpos = normal_matrix * vpos;
+	vec4 vpos = normal_matrix * in_pos;
 	vpos.w = 1.0 / vpos.z;
 	vpos.z = vpos.w;
 	vpos.xy *= vpos.w;
@@ -1001,11 +999,6 @@ struct gl4rend : Renderer
 #endif
 			glsm_ctl(GLSM_CTL_STATE_UNBIND, NULL);
 		return ret;
-	}
-
-	void Present() override
-	{
-		co_dc_yield();
 	}
 
 	virtual u64 GetTexture(TSP tsp, TCW tcw) override

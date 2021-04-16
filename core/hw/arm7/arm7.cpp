@@ -79,7 +79,7 @@ void arm_Run_(u32 CycleCount)
 	}
 }
 
-void arm_Run(u32 samples)
+void aicaarm::run(u32 samples)
 {
 	for (u32 i = 0; i < samples; i++)
 	{
@@ -91,12 +91,12 @@ void arm_Run(u32 samples)
 
 void armt_init();
 
-void arm_Init()
+void aicaarm::init()
 {
 #if FEAT_AREC != DYNAREC_NONE
 	armt_init();
 #endif
-	arm_Reset();
+   aicaarm::reset();
 
 	for (int i = 0; i < 256; i++)
 	{
@@ -275,8 +275,9 @@ void CPUUndefinedException()
 
 void FlushCache();
 
-void arm_Reset()
+void aicaarm::reset()
 {
+   DEBUG_LOG(AICA_ARM, "AICA ARM Reset");
 #if FEAT_AREC != DYNAREC_NONE
 	FlushCache();
 #endif
@@ -338,15 +339,13 @@ void CPUFiq()
 #include "hw/sh4/sh4_core.h"
 
 
-void arm_SetEnabled(bool enabled)
+void aicaarm::enable(bool enabled)
 {
 	if(!Arm7Enabled && enabled)
-			arm_Reset();
+      aicaarm::reset();
 	
 	Arm7Enabled=enabled;
 }
-
-
 
 void update_armintc()
 {
@@ -596,7 +595,7 @@ u8 ARM7_TCB[ICacheSize+4096];
 
 u8 ARM7_TCB[ICacheSize+4096] __attribute__((section(".text")));
 
-#elif defined(__MACH__)
+#elif defined(__APPLE__)
 u8 ARM7_TCB[ICacheSize+4096] __attribute__((section("__TEXT, .text")));
 #else
 #error ARM7_TCB ALLOC
@@ -1453,7 +1452,7 @@ void  armEmit32(u32 emit32)
 	icPtr+=4;
 }
 
-#if HOST_OS==OS_DARWIN
+#if defined(__APPLE__)
 #include <libkern/OSCacheControl.h>
 extern "C" void armFlushICache(void *code, void *pEnd) {
     sys_dcache_flush(code, (u8*)pEnd - (u8*)code + 1);
@@ -1533,7 +1532,7 @@ void armv_MOV32(eReg regn, u32 imm)
 #endif
 
 //Run a timeslice for ARMREC
-void arm_Run(u32 samples)
+void aicaarm::run(u32 samples)
 {
 	for (int i = 0; i < samples; i++)
 	{
@@ -2021,7 +2020,7 @@ void FlushCache()
 
 
 
-#if HOST_CPU==CPU_X86 && HOST_OS == OS_WINDOWS
+#if HOST_CPU==CPU_X86 && defined(_WIN32)
 
 #include <windows.h>
 

@@ -33,7 +33,7 @@ protected:
 class NaomiCartridge : public Cartridge
 {
 public:
-	NaomiCartridge(u32 size) : Cartridge(size), RomPioOffset(0), RomPioAutoIncrement(0), DmaOffset(0), DmaCount(0xffff) {}
+   NaomiCartridge(u32 size) : Cartridge(size), RomPioOffset(0), RomPioAutoIncrement(false), DmaOffset(0), DmaCount(0xffff) {}
 
 	virtual u32 ReadMem(u32 address, u32 size) override;
 	virtual void WriteMem(u32 address, u32 data, u32 size) override;
@@ -64,7 +64,7 @@ protected:
 class DecryptedCartridge : public NaomiCartridge
 {
 public:
-	DecryptedCartridge(u8 *rom_ptr, u32 size) : NaomiCartridge(size) { RomPtr = rom_ptr; }
+	DecryptedCartridge(u8 *rom_ptr, u32 size) : NaomiCartridge(size) { free(RomPtr); RomPtr = rom_ptr; }
 	virtual ~DecryptedCartridge() override;
 };
 

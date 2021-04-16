@@ -26,8 +26,6 @@
 #include <memory>
 #include <vector>
 
-void co_dc_yield();
-
 class BaseVulkanRenderer : public Renderer
 {
 public:
@@ -80,17 +78,20 @@ public:
 		texCommandPool.BeginFrame();
 		textureCache.SetCurrentIndex(texCommandPool.GetIndex());
 
+      if (!ctx->rend.isRTT)
+         vmus->PrepareOSD(&texCommandPool);
+
 		if (ctx->rend.isRenderFramebuffer)
 			return RenderFramebuffer();
 
-		ctx->rend_inuse.Lock();
+		ctx->rend_inuse.lock();
 
 		if (KillTex)
 			textureCache.Clear();
 
 		bool result = ta_parse_vdrc(ctx);
 
-		textureCache.CollectCleanup();
+		textureCache.Cleanup();
 
 		if (result)
 		{
@@ -101,11 +102,6 @@ public:
 			texCommandPool.EndFrame();
 
 		return result;
-	}
-
-	void Present() override
-	{
-		co_dc_yield();
 	}
 
 protected:

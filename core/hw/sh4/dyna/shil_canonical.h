@@ -583,8 +583,19 @@ shil_canonical
 (
 u64,f1,(u32 r1, u32 r2, u32 r3),
 	u64 dividend = ((u64)r3 << 32) | r1;
-	u32 quo = dividend / r2;
-	u32 rem = dividend % r2;
+   u32 quo;
+   u32 rem;
+
+   if (r2)
+	{
+		quo = dividend / r2;
+		rem = dividend % r2;
+	}
+	else
+	{
+		quo = 0;
+		rem = dividend;
+	}
 
 	u64 rv;
 	((u32*)&rv)[0]=quo;
@@ -613,7 +624,7 @@ u64,f1,(u32 r1, s32 r2, s32 r3),
 	if (dividend < 0)
 		dividend++;
 
-	s32 quo = (s32)(dividend / r2);
+   s32 quo = (s32)(r2 ? dividend / r2 : 0);
 	s32 rem = dividend - quo * r2;
 	u32 negative = (r3 ^ r2) & 0x80000000;
 	// 2's complement -> 1's complement
@@ -908,15 +919,15 @@ shil_opc(fipr)
 #if HOST_CPU == CPU_X86 || HOST_CPU == CPU_X64
 shil_canonical
 (
-f32,f1,(float* fn, float* fm),
+f32,f1,(const float* fn, const float* fm),
 
-	// Using double for better precision on x86 (Sonic Adventure)
-	double idp = (double)fn[0] * fm[0];
-	idp += (double)fn[1] * fm[1];
-	idp += (double)fn[2] * fm[2];
-	idp += (double)fn[3] * fm[3];
+	// multiplications are done with 28 bits of precision (53 - 25) and the final sum at 30 bits
+	double idp = reduce_precision<25>((double)fn[0] * fm[0]);
+	idp += reduce_precision<25>((double)fn[1] * fm[1]);
+	idp += reduce_precision<25>((double)fn[2] * fm[2]);
+	idp += reduce_precision<25>((double)fn[3] * fm[3]);
 
-	return fixNaN((float)idp);
+	return (float)fixNaN64(idp);
 )
 #else
 shil_canonical
@@ -946,39 +957,67 @@ shil_opc_end()
 
 //shop_ftrv
 shil_opc(ftrv)
+#if HOST_CPU == CPU_X86 || HOST_CPU == CPU_X64
+shil_canonical
+(
+void,f1,(float* fd, const float* fn, const float* fm),
+
+	double v1 = reduce_precision<25>((double)fm[0]  * fn[0]) +
+				reduce_precision<25>((double)fm[4]  * fn[1]) +
+				reduce_precision<25>((double)fm[8]  * fn[2]) +
+				reduce_precision<25>((double)fm[12] * fn[3]);
+
+	double v2 = reduce_precision<25>((double)fm[1]  * fn[0]) +
+				reduce_precision<25>((double)fm[5]  * fn[1]) +
+				reduce_precision<25>((double)fm[9]  * fn[2]) +
+				reduce_precision<25>((double)fm[13] * fn[3]);
+
+	double v3 = reduce_precision<25>((double)fm[2]  * fn[0]) +
+				reduce_precision<25>((double)fm[6]  * fn[1]) +
+				reduce_precision<25>((double)fm[10] * fn[2]) +
+				reduce_precision<25>((double)fm[14] * fn[3]);
+
+	double v4 = reduce_precision<25>((double)fm[3]  * fn[0]) +
+				reduce_precision<25>((double)fm[7]  * fn[1]) +
+				reduce_precision<25>((double)fm[11] * fn[2]) +
+				reduce_precision<25>((double)fm[15] * fn[3]);
+
+	fd[0] = (float)fixNaN64(v1);
+	fd[1] = (float)fixNaN64(v2);
+	fd[2] = (float)fixNaN64(v3);
+	fd[3] = (float)fixNaN64(v4);
+)
+#else
 shil_canonical
 (
 void,f1,(float* fd,float* fn, float* fm),
-	float v1;
-	float v2;
-	float v3;
-	float v4;
 
-	v1 = fm[0]  * fn[0] +
-		 fm[4]  * fn[1] +
-		 fm[8]  * fn[2] +
-		 fm[12] * fn[3];
+	float v1 = fm[0]  * fn[0] +
+			   fm[4]  * fn[1] +
+			   fm[8]  * fn[2] +
+			   fm[12] * fn[3];
 
-	v2 = fm[1]  * fn[0] +
-		 fm[5]  * fn[1] +
-		 fm[9]  * fn[2] +
-		 fm[13] * fn[3];
+	float v2 = fm[1]  * fn[0] +
+			   fm[5]  * fn[1] +
+			   fm[9]  * fn[2] +
+			   fm[13] * fn[3];
 
-	v3 = fm[2]  * fn[0] +
-		 fm[6]  * fn[1] +
-		 fm[10] * fn[2] +
-		 fm[14] * fn[3];
+	float v3 = fm[2]  * fn[0] +
+			   fm[6]  * fn[1] +
+			   fm[10] * fn[2] +
+			   fm[14] * fn[3];
 
-	v4 = fm[3]  * fn[0] +
-		 fm[7]  * fn[1] +
-		 fm[11] * fn[2] +
-		 fm[15] * fn[3];
+	float v4 = fm[3]  * fn[0] +
+			   fm[7]  * fn[1] +
+			   fm[11] * fn[2] +
+			   fm[15] * fn[3];
 
-   fd[0] = fixNaN(v1);
+	fd[0] = fixNaN(v1);
 	fd[1] = fixNaN(v2);
 	fd[2] = fixNaN(v3);
 	fd[3] = fixNaN(v4);
 )
+#endif
 shil_compile
 (
 	shil_cf_arg_ptr(rs2);
@@ -1061,7 +1100,7 @@ shil_opc_end()
 shil_opc(frswap)
 shil_canonical
 (
-void,f1,(u64* fd1,u64* fd2,u64* fs1,u64* fs2),
+void,f1,(u64* fd1, u64* fd2, const u64* fs1, const u64* fs2),
 
 	u64 temp;
 	for (int i=0;i<8;i++)

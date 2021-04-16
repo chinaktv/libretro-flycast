@@ -105,8 +105,7 @@ void maple_device::Setup(u32 prt)
 }
 maple_device::~maple_device()
 {
-	if (config)
-		delete config;
+   delete config;
 }
 
 /*
@@ -570,7 +569,7 @@ struct maple_sega_vmu: maple_base
 	{
 		memset(flash_data,0,sizeof(flash_data));
 		memset(lcd_data,0,sizeof(lcd_data));
-		string apath = get_writable_vmu_path(logical_port);
+      std::string apath = get_writable_vmu_path(logical_port);
 
 		vmu_screen_params[bus_id].vmu_lcd_screen = lcd_data_decoded ;
 
@@ -1488,11 +1487,12 @@ struct maple_lightgun : maple_base
 	  }
    }
 
-   virtual void get_lightgun_pos()
+   virtual bool get_lightgun_pos()
    {
 	  f32 x, y;
 	  config->GetAbsolutePosition(&x, &y);
 	  read_lightgun_position(x + 0.5f, y + 0.5f);
+     return true;
    }
 };
 

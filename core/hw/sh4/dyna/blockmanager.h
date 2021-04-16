@@ -62,9 +62,9 @@ struct RuntimeBlockInfo: RuntimeBlockInfo_Core
 	BlockEndType BlockType;
 	bool has_jcond;
 
-	vector<shil_opcode> oplist;
+   std::vector<shil_opcode> oplist;
 
-	bool contains_code(u8* ptr)
+	bool contains_code(const u8* ptr)
 	{
 		return ((size_t)(ptr-(u8*)code)) < host_code_size;
 	}
@@ -75,10 +75,10 @@ struct RuntimeBlockInfo: RuntimeBlockInfo_Core
 	virtual void Relocate(void* dst)=0;
 	
 	//predecessors references
-	vector<RuntimeBlockInfoPtr> pre_refs;
+   std::vector<RuntimeBlockInfoPtr> pre_refs;
 
-	void AddRef(RuntimeBlockInfoPtr other);
-	void RemRef(RuntimeBlockInfoPtr other);
+   void AddRef(const RuntimeBlockInfoPtr& other);
+	void RemRef(const RuntimeBlockInfoPtr& other);
 
 	void Discard();
 	void UpdateRefs();
@@ -90,10 +90,9 @@ struct RuntimeBlockInfo: RuntimeBlockInfo_Core
 	bool read_only;
 };
 
-void bm_WriteBlockMap(const string& file);
+void bm_WriteBlockMap(const std::string& file);
 
 extern "C" {
-__attribute__((used)) DynarecCodeEntryPtr DYNACALL bm_GetCode(u32 addr);
 __attribute__((used)) DynarecCodeEntryPtr DYNACALL bm_GetCodeByVAddr(u32 addr);
 }
 
@@ -111,7 +110,7 @@ void bm_Periodical_1s();
 void bm_Init();
 void bm_Term();
 
-void bm_vmem_pagefill(void** ptr,u32 PAGE_SZ);
+void bm_vmem_pagefill(void** ptr,u32 size_bytes);
 bool bm_RamWriteAccess(void *p);
 void bm_RamWriteAccess(u32 addr);
 static inline bool bm_IsRamPageProtected(u32 addr)

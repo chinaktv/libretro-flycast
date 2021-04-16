@@ -1,6 +1,7 @@
 #pragma once
 #include "ta.h"
 #include "pvr_regs.h"
+#include "helper_classes.h"
 
 // helper for 32 byte aligned memory allocation
 void* OS_aligned_malloc(size_t align, size_t size);
@@ -160,7 +161,6 @@ struct rend_context
 struct TA_context
 {
 	u32 Address;
-	u32 LastUsed;
 
 	cMutex thd_inuse;
 	cMutex rend_inuse;
@@ -203,7 +203,7 @@ struct TA_context
 		rend.verts.InitBytes(vert_size,&rend.Overrun, "verts"); 
 		rend.idx.Init(120*1024,&rend.Overrun, "idx"); // up to 120K indices (idx have stripification overhead)
 		rend.global_param_op.Init(16384,&rend.Overrun, "global_param_op");
-		rend.global_param_pt.Init(4096,&rend.Overrun, "global_param_pt");
+		rend.global_param_pt.Init(5120,&rend.Overrun, "global_param_pt");
 		rend.global_param_mvo.Init(4096,&rend.Overrun, "global_param_mvo");
       rend.global_param_mvo_tr.Init(4096,&rend.Overrun, "global_param_mvo_tr");
 #if STRIPS_AS_PPARAMS
@@ -224,10 +224,10 @@ struct TA_context
 	void Reset()
 	{
       tad.Clear();
-      rend_inuse.Lock();
+      rend_inuse.lock();
 		rend.Clear();
 		rend.proc_end = rend.proc_start = tad.thd_root;
-      rend_inuse.Unlock();
+      rend_inuse.unlock();
 	}
 
 	void Free()
@@ -274,6 +274,5 @@ void VDecEnd();
 
 //must be moved to proper header
 void FillBGP(TA_context* ctx);
-bool UsingAutoSort(int pass_number);
 void SerializeTAContext(void **data, unsigned int *total_size);
-void UnserializeTAContext(void **data, unsigned int *total_size);
+void UnserializeTAContext(void **data, unsigned int *total_size, serialize_version_enum version);

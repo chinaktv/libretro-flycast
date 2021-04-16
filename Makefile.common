@@ -4,6 +4,8 @@ LIBRETRO_COMM_DIR = $(CORE_DIR)/core/libretro-common
 INCFLAGS    += -I$(CORE_DIR)/core/libretro \
 					-I$(CORE_DIR)/core/ \
 					-I$(DEPS_DIR) \
+					-I$(CORE_DIR)/core/deps/libchdr/include \
+					-I$(CORE_DIR)/core/deps/lzma/C \
 					-I$(LIBRETRO_COMM_DIR)/include \
 					-I$(DEPS_DIR)/vixl \
 					-I$(DEPS_DIR)/stb
@@ -14,6 +16,7 @@ SOURCES_CXX := \
 					$(CORE_DIR)/core/hw/arm7/arm64.cpp \
 					$(CORE_DIR)/core/hw/arm7/arm7.cpp \
 					$(CORE_DIR)/core/hw/arm7/virt_arm.cpp \
+					$(CORE_DIR)/core/hw/arm7/vbaARM.cpp \
 					\
 					$(CORE_DIR)/core/hw/aica/dsp.cpp \
 					$(CORE_DIR)/core/hw/aica/dsp_arm64.cpp \
@@ -79,8 +82,7 @@ SOURCES_CXX := \
 					$(CORE_DIR)/core/imgread/common.cpp \
 					$(CORE_DIR)/core/imgread/cue.cpp \
 					$(CORE_DIR)/core/imgread/gdi.cpp \
-					$(CORE_DIR)/core/log/ConsoleListener.cpp \
-					$(CORE_DIR)/core/log/LogManager.cpp \
+					$(CORE_DIR)/core/log/LogManagerLibretro.cpp \
 					\
 					$(CORE_DIR)/core/cheats.cpp \
 					$(CORE_DIR)/core/nullDC.cpp \
@@ -161,23 +163,11 @@ endif
 LIBCHDR_INCFLAGS = -I$(DEPS_DIR)/flac/include
 
 LIBCHDR_SOURCES_C = \
-					$(DEPS_DIR)/chdr/bitstream.c \
-					$(DEPS_DIR)/chdr/cdrom.c \
-					$(DEPS_DIR)/chdr/chd.c \
-					$(DEPS_DIR)/chdr/flac.c \
-					$(DEPS_DIR)/chdr/huffman.c \
-					\
-					$(DEPS_DIR)/flac/bitmath.c \
-					$(DEPS_DIR)/flac/bitreader.c \
-					$(DEPS_DIR)/flac/cpu.c \
-					$(DEPS_DIR)/flac/crc.c \
-					$(DEPS_DIR)/flac/fixed.c \
-					$(DEPS_DIR)/flac/float.c \
-					$(DEPS_DIR)/flac/format.c \
-					$(DEPS_DIR)/flac/lpc.c \
-					$(DEPS_DIR)/flac/md5.c \
-					$(DEPS_DIR)/flac/memory.c \
-					$(DEPS_DIR)/flac/stream_decoder.c
+					$(DEPS_DIR)/libchdr/src/libchdr_bitstream.c \
+					$(DEPS_DIR)/libchdr/src/libchdr_cdrom.c \
+					$(DEPS_DIR)/libchdr/src/libchdr_chd.c \
+					$(DEPS_DIR)/libchdr/src/libchdr_flac.c \
+					$(DEPS_DIR)/libchdr/src/libchdr_huffman.c \
 
 LIBZIP_SOURCES_C = \
 					$(DEPS_DIR)/libzip/mkstemp.c \
@@ -239,9 +229,13 @@ PICOTCP_INCFLAGS = \
 					-I$(DEPS_DIR)/picotcp/include \
 					-I$(DEPS_DIR)/picotcp/modules
 
+PICOTCP_CFLAGS = -DPICO_SUPPORT_UDP -DPICO_SUPPORT_DHCPD
+
 PICOTCP_SOURCES_C = \
 					$(DEPS_DIR)/picotcp/modules/pico_arp.c \
 					$(DEPS_DIR)/picotcp/modules/pico_dev_ppp.c \
+					$(DEPS_DIR)/picotcp/modules/pico_dhcp_common.c \
+					$(DEPS_DIR)/picotcp/modules/pico_dhcp_server.c \
 					$(DEPS_DIR)/picotcp/modules/pico_dns_client.c \
 					$(DEPS_DIR)/picotcp/modules/pico_dns_common.c \
 					$(DEPS_DIR)/picotcp/modules/pico_ethernet.c \
@@ -264,19 +258,14 @@ XXHASH_SOURCES_C = $(DEPS_DIR)/xxhash/xxhash.c
 
 ZLIB_SOURCES_C = \
 					$(DEPS_DIR)/zlib/deflate.c \
-					$(DEPS_DIR)/zlib/gzlib.c \
 					$(DEPS_DIR)/zlib/uncompr.c \
 					$(DEPS_DIR)/zlib/zutil.c \
 					$(DEPS_DIR)/zlib/inffast.c \
-					$(DEPS_DIR)/zlib/gzread.c \
 					$(DEPS_DIR)/zlib/crc32.c \
-					$(DEPS_DIR)/zlib/gzwrite.c \
 					$(DEPS_DIR)/zlib/inflate.c \
 					$(DEPS_DIR)/zlib/infback.c \
 					$(DEPS_DIR)/zlib/inftrees.c \
 					$(DEPS_DIR)/zlib/trees.c \
-					$(DEPS_DIR)/zlib/gzclose.c \
-					$(DEPS_DIR)/zlib/compress.c \
 					$(DEPS_DIR)/zlib/adler32.c
 
 SOURCES_ASM :=
@@ -293,6 +282,7 @@ ifeq ($(SYSTEM_PICOTCP), 1)
 	LIBS += $(shell pkg-config --libs picotcp)
 else
 	INCFLAGS += $(PICOTCP_INCFLAGS)
+	CFLAGS    += $(PICOTCP_CFLAGS)
 	SOURCES_C += $(PICOTCP_SOURCES_C)
 endif
 
@@ -307,12 +297,32 @@ ifeq ($(NO_REND), 1)
 	SOURCES_CXX += $(CORE_DIR)/core/rend/norend/norend.cpp
 endif
 
-ifeq ($(HAVE_MODEM), 1)
+ifeq ($(ENABLE_MODEM), 1)
+	INCFLAGS    += -I$(CORE_DIR)/core/deps/miniupnpc
 	SOURCES_CXX += $(CORE_DIR)/core/hw/modem/dns.cpp \
-					$(CORE_DIR)/core/hw/modem/modem.cpp \
-					$(CORE_DIR)/core/hw/modem/picoppp.cpp
+						$(CORE_DIR)/core/hw/modem/modem.cpp \
+						$(CORE_DIR)/core/hw/bba/bba.cpp \
+						$(CORE_DIR)/core/hw/bba/rtl8139c.cpp \
+						$(CORE_DIR)/core/network/picoppp.cpp \
+						$(CORE_DIR)/core/network/miniupnp.cpp
 
-	CORE_DEFINES += -DHAVE_MODEM
+	SOURCES_C += \
+					 $(CORE_DIR)/core/deps/miniupnpc/addr_is_reserved.c \
+					 $(CORE_DIR)/core/deps/miniupnpc/igd_desc_parse.c \
+					 $(CORE_DIR)/core/deps/miniupnpc/upnpreplyparse.c \
+					 $(CORE_DIR)/core/deps/miniupnpc/upnpcommands.c \
+					 $(CORE_DIR)/core/deps/miniupnpc/upnperrors.c \
+					 $(CORE_DIR)/core/deps/miniupnpc/connecthostport.c \
+					 $(CORE_DIR)/core/deps/miniupnpc/portlistingparse.c \
+					 $(CORE_DIR)/core/deps/miniupnpc/receivedata.c \
+					 $(CORE_DIR)/core/deps/miniupnpc/upnpdev.c \
+					 $(CORE_DIR)/core/deps/miniupnpc/minissdpc.c \
+					 $(CORE_DIR)/core/deps/miniupnpc/miniwget.c \
+					 $(CORE_DIR)/core/deps/miniupnpc/miniupnpc.c \
+					 $(CORE_DIR)/core/deps/miniupnpc/minixml.c \
+					 $(CORE_DIR)/core/deps/miniupnpc/minisoap.c
+
+	CORE_DEFINES += -DENABLE_MODEM -DMINIUPNP_STATICLIB
 endif
 
 ifeq ($(HAVE_GL), 1)
@@ -370,7 +380,9 @@ SOURCES_CXX += $(CORE_DIR)/core/hw/naomi/naomi.cpp \
 					$(CORE_DIR)/core/hw/naomi/m1cartridge.cpp \
 					$(CORE_DIR)/core/hw/naomi/m4cartridge.cpp \
 					$(CORE_DIR)/core/hw/naomi/awcartridge.cpp \
-					$(CORE_DIR)/core/hw/naomi/gdcartridge.cpp
+					$(CORE_DIR)/core/hw/naomi/gdcartridge.cpp \
+					$(CORE_DIR)/core/hw/naomi/naomi_m3comm.cpp \
+					$(CORE_DIR)/core/network/naomi_network.cpp
 
 ifeq ($(HAVE_GENERIC_JIT), 1)
 	DYNAREC_USED = 1
@@ -430,12 +442,11 @@ endif
 
 # Dynarec
 ifeq ($(DYNAREC_USED), 1)
-	SOURCES_CXX += $(CORE_DIR)/core/rec.cpp
-	SOURCES_CXX += $(CORE_DIR)/core/hw/sh4/dyna/decoder.cpp \
-						$(CORE_DIR)/core/hw/sh4/dyna/driver.cpp \
-						$(CORE_DIR)/core/hw/sh4/dyna/blockmanager.cpp \
-						$(CORE_DIR)/core/hw/sh4/dyna/shil.cpp \
-						$(CORE_DIR)/core/hw/sh4/dyna/ssa.cpp 
+SOURCES_CXX += $(CORE_DIR)/core/hw/sh4/dyna/decoder.cpp \
+					$(CORE_DIR)/core/hw/sh4/dyna/driver.cpp \
+					$(CORE_DIR)/core/hw/sh4/dyna/blockmanager.cpp \
+					$(CORE_DIR)/core/hw/sh4/dyna/shil.cpp \
+					$(CORE_DIR)/core/hw/sh4/dyna/ssa.cpp 
 endif
 
 SOURCES_CXX += $(CORE_DIR)/core/libretro/libretro.cpp \
@@ -490,11 +501,8 @@ SOURCES_C += \
 				$(DEPS_DIR)/lzma/C/LzFind.c \
 				$(DEPS_DIR)/lzma/C/Lzma2Dec.c \
 				$(DEPS_DIR)/lzma/C/Lzma86Dec.c \
-				$(DEPS_DIR)/lzma/C/Lzma86Enc.c \
 				$(DEPS_DIR)/lzma/C/LzmaDec.c \
-				$(DEPS_DIR)/lzma/C/LzmaEnc.c \
-				$(DEPS_DIR)/lzma/C/LzmaLib.c \
-				$(DEPS_DIR)/lzma/C/Sort.c
+				$(DEPS_DIR)/lzma/C/LzmaEnc.c
 
 ifeq ($(SYSTEM_ZLIB), 1)
 	CFLAGS += $(shell pkg-config --cflags zlib)

@@ -1,5 +1,6 @@
 #pragma once
-#include "drkPvr.h"
+#include "types.h"
+#include "pvr_types.h"
 
 #define pvr_RegSize (0x8000)
 #define pvr_RegMask (pvr_RegSize-1)
@@ -8,9 +9,7 @@
 
 extern u8 pvr_regs[pvr_RegSize];
 
-void Regs_Reset(bool Manual);
-
-
+void Regs_Reset(bool hard);
 
 #define ID_addr                 0x00000000 // R   Device ID
 #define REVISION_addr           0x00000004 // R   Revision number

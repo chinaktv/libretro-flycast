@@ -14,7 +14,7 @@
 #include "hw/sh4/sh4_sched.h"
 
 
-#if HOST_OS==OS_LINUX && defined(DYNA_OPROF)
+#if defined(__unix__) && defined(DYNA_OPROF)
 #include <opagent.h>
 op_agent_t          oprofHandle;
 #endif
@@ -41,7 +41,7 @@ u32 unprotected_blocks;
 
 // addr must be a physical address
 // This returns an executable address
-DynarecCodeEntryPtr DYNACALL bm_GetCode(u32 addr)
+static DynarecCodeEntryPtr DYNACALL bm_GetCode(u32 addr)
 {
 	DynarecCodeEntryPtr rv = FPCA(addr);
 
@@ -234,7 +234,6 @@ void bm_vmem_pagefill(void** ptr, u32 size_bytes)
 
 void bm_Reset()
 {
-	bm_ResetCache();
 	bm_CleanupDeletedBlocks();
 	protected_blocks = 0;
 	unprotected_blocks = 0;
@@ -386,7 +385,7 @@ void bm_Term()
 	bm_Reset();
 }
 
-void bm_WriteBlockMap(const string& file)
+void bm_WriteBlockMap(const std::string& file)
 {
 	FILE* f=fopen(file.c_str(),"wb");
 	if (f)
@@ -401,6 +400,16 @@ void bm_WriteBlockMap(const string& file)
 		}
 		fclose(f);
 		INFO_LOG(DYNAREC, "Finished writing block map");
+	}
+}
+
+#if 0
+void sh4_jitsym(FILE* out)
+{
+	for (auto& it : blkmap)
+	{
+		RuntimeBlockInfoPtr& block = it.second;
+		fprintf(out, "%p %d %08X\n", block->code, block->host_code_size, block->addr);
 	}
 }
 
@@ -424,15 +433,6 @@ bool UDgreater3 ( RuntimeBlockInfo* elem1, RuntimeBlockInfo* elem2 )
 	return elem1->runs*elem1->host_opcodes/elem1->guest_cycles > elem2->runs*elem2->host_opcodes/elem2->guest_cycles;
 }
 
-void sh4_jitsym(FILE* out)
-{
-	for (auto& it : blkmap)
-	{
-		RuntimeBlockInfoPtr& block = it.second;
-		fprintf(out, "%p %d %08X\n", block->code, block->host_code_size, block->addr);
-	}
-}
-#if 0
 void bm_PrintTopBlocks()
 {
 	double total_lups=0;
@@ -529,12 +529,12 @@ RuntimeBlockInfo::~RuntimeBlockInfo()
 	}
 }
 
-void RuntimeBlockInfo::AddRef(RuntimeBlockInfoPtr other)
+void RuntimeBlockInfo::AddRef(const RuntimeBlockInfoPtr& other)
 { 
 	pre_refs.push_back(other); 
 }
 
-void RuntimeBlockInfo::RemRef(RuntimeBlockInfoPtr other)
+void RuntimeBlockInfo::RemRef(const RuntimeBlockInfoPtr& other)
 { 
 	bm_List::iterator it = std::find(pre_refs.begin(), pre_refs.end(), other);
 	if (it != pre_refs.end())
@@ -560,7 +560,7 @@ void RuntimeBlockInfo::Discard()
 		// Remove this block from the per-page block lists
 		for (u32 addr = this->addr & ~PAGE_MASK; addr < this->addr + this->sh4_code_size; addr += PAGE_SIZE)
 		{
-			set<RuntimeBlockInfo*>& block_list = blocks_per_page[(addr & RAM_MASK) / PAGE_SIZE];
+         auto& block_list = blocks_per_page[(addr & RAM_MASK) / PAGE_SIZE];
 			block_list.erase(this);
 		}
 	}
@@ -607,8 +607,8 @@ void bm_RamWriteAccess(u32 addr)
 	}
 	unprotected_pages[addr / PAGE_SIZE] = true;
 	bm_UnlockPage(addr);
-	set<RuntimeBlockInfo*>& block_list = blocks_per_page[addr / PAGE_SIZE];
-	vector<RuntimeBlockInfo*> list_copy;
+   std::set<RuntimeBlockInfo*>& block_list = blocks_per_page[addr / PAGE_SIZE];
+   std::vector<RuntimeBlockInfo*> list_copy;
 	list_copy.insert(list_copy.begin(), block_list.begin(), block_list.end());
 	if (!list_copy.empty())
 		DEBUG_LOG(DYNAREC, "bm_RamWriteAccess write access to %08x pc %08x", addr, next_pc);
@@ -684,7 +684,7 @@ void print_blocks()
 	if (print_stats)
 	{
 		f=fopen(get_writable_data_path("/blkmap.lst").c_str(),"w");
-		print_stats=0;
+		print_stats=false;
 
 		INFO_LOG(DYNAREC, "Writing blocks to %p", f);
 	}
@@ -743,7 +743,7 @@ void print_blocks()
 #endif
 				}
 
-				string s=op->dissasm();
+            std::string s=op->dissasm();
 				fprintf(f,"//il:%d:%d:%s\n",op->guest_offs,op->host_offs,s.c_str());
 			}
 			

@@ -204,14 +204,14 @@ static mem_handle_t allocate_shared_filemem(unsigned size) {
 	void* mem = memalign(0x1000, size);
 	return (uintptr_t)mem;
 	#else
-		#if HOST_OS != OS_DARWIN
+		#if !defined(__APPLE__)
 		fd = shm_open("/dcnzorz_mem", O_CREAT | O_EXCL | O_RDWR, S_IREAD | S_IWRITE);
 		shm_unlink("/dcnzorz_mem");
 		#endif
 
 		// if shmem does not work (or using OSX) fallback to a regular file on disk
 		if (fd < 0) {
-			string path = get_writable_data_path("/dcnzorz_mem");
+         std::string path = get_writable_data_path("/dcnzorz_mem");
 			fd = open(path.c_str(), O_CREAT|O_RDWR|O_TRUNC, S_IRWXU|S_IRWXG|S_IRWXO);
 			unlink(path.c_str());
 		}
@@ -408,7 +408,7 @@ static void Arm64_CacheFlush(void* start, void* end) {
 	if (start == end)
 		return;
 
-#if HOST_OS == OS_DARWIN
+#if defined(__APPLE__)
 	// Header file says this is equivalent to: sys_icache_invalidate(start, end - start);
 	sys_cache_control(kCacheFunctionPrepareForExecution, start, end - start);
 #else

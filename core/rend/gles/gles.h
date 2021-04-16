@@ -137,7 +137,6 @@ void SetupMatrices(float dc_width, float dc_height,
 				   float scale_x, float scale_y, float scissoring_scale_x, float scissoring_scale_y,
 				   float &ds2s_offs_x, glm::mat4& normal_mat, glm::mat4& scissor_mat);
 void UpdatePaletteTexture(GLenum texture_slot);
-text_info raw_GetTexture(TSP tsp, TCW tcw);
 void DoCleanup();
 void SortPParams(int first, int count);
 void SetCull(u32 CullMode);
@@ -159,7 +158,6 @@ void findGLVersion();
 GLuint gl_CompileShader(const char* shader, GLuint type);
 GLuint gl_CompileAndLink(const char* VertexShader, const char* FragmentShader);
 bool CompilePipelineShader(PipelineShader* s);
-void co_dc_yield(void);
 void vertex_buffer_unmap();
 
 extern GLuint vmuTextureId[4];
@@ -221,7 +219,6 @@ class TextureCacheData : public BaseTextureCacheData
 {
 public:
 	GLuint texID;   //gl texture
-	u16* pData;
 	virtual std::string GetId() override { return std::to_string(texID); }
 	virtual void UploadToGPU(int width, int height, u8 *temp_tex_buffer, bool mipmapped, bool mipmapsIncluded = false) override;
 	virtual bool Delete() override;

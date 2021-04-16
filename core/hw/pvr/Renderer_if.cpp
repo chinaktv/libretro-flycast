@@ -2,7 +2,9 @@
 #include "ta.h"
 #include "hw/pvr/pvr_mem.h"
 #include "rend/TexCache.h"
+#include "hw/mem/_vmem.h"
 #include "cheats.h"
+#include "spg.h"
 
 /*
 
@@ -78,6 +80,7 @@ cResetEvent re;
 extern cResetEvent frame_finished;
 static bool swap_pending;
 static bool do_swap;
+u32 fb_w_cur = 1;
 
 int max_idx,max_mvo,max_op,max_pt,max_tr,max_vtx,max_modt, ovrn;
 bool pend_rend = false;
@@ -88,7 +91,6 @@ u32 fb_watch_addr_end;
 bool fb_dirty;
 
 TA_context* _pvrrc;
-void SetREP(TA_context* cntx);
 
 void rend_create_renderer()
 {
@@ -130,8 +132,7 @@ void rend_init_renderer()
 		delete renderer;
     	if (fallback_renderer == NULL || !fallback_renderer->Init())
     	{
-    		if (fallback_renderer != NULL)
-    			delete fallback_renderer;
+         delete fallback_renderer;
     		die("Renderer initialization failed\n");
     	}
     	INFO_LOG(PVR, "Selected renderer initialization failed. Falling back to default renderer.");
@@ -264,14 +265,14 @@ void rend_start_render(void)
          ctx->rend.fog_clamp_min = FOG_CLAMP_MIN;
 			ctx->rend.fog_clamp_max = FOG_CLAMP_MAX;
 
-         max_idx              = max(max_idx,  ctx->rend.idx.used());
-         max_vtx              = max(max_vtx,  ctx->rend.verts.used());
-         max_op               = max(max_op,   ctx->rend.global_param_op.used());
-         max_pt               = max(max_pt,   ctx->rend.global_param_pt.used());
-         max_tr               = max(max_tr,   ctx->rend.global_param_tr.used());
+         max_idx              = std::max(max_idx,  ctx->rend.idx.used());
+         max_vtx              = std::max(max_vtx,  ctx->rend.verts.used());
+         max_op               = std::max(max_op,   ctx->rend.global_param_op.used());
+         max_pt               = std::max(max_pt,   ctx->rend.global_param_pt.used());
+         max_tr               = std::max(max_tr,   ctx->rend.global_param_tr.used());
 
-         max_mvo              = max(max_mvo,  ctx->rend.global_param_mvo.used());
-         max_modt             = max(max_modt, ctx->rend.modtrig.used());
+         max_mvo              = std::max(max_mvo,  ctx->rend.global_param_mvo.used());
+         max_modt             = std::max(max_modt, ctx->rend.modtrig.used());
 
          if (QueueRender(ctx))
          {

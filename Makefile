@@ -4,7 +4,7 @@ DEBUG_UBSAN   := 0
 NO_REND       := 0
 HAVE_GL       := 1
 HAVE_GL2      := 0
-HAVE_OIT      := 0
+HAVE_OIT      ?= 0
 HAVE_VULKAN   := 0
 HAVE_CORE     := 0
 NO_THREADS    := 0
@@ -21,7 +21,7 @@ HAVE_OPENMP   := 1
 HAVE_CHD      := 1
 HAVE_CLANG    ?= 0
 HAVE_CDROM    := 0
-HAVE_MODEM    := 1
+ENABLE_MODEM  := 1
 
 TARGET_NAME   := flycast
 
@@ -38,6 +38,9 @@ ifeq ($(HAVE_LTCG),1)
 	SHARED   += -flto
 endif
 
+ifneq (${AS},)
+	CC_AS := ${AS}
+endif
 CC_AS    ?= ${CC_PREFIX}as
 
 MFLAGS   := 
@@ -205,8 +208,8 @@ else ifneq (,$(findstring rpi,$(platform)))
 			CFLAGS += -mcpu=cortex-a7 -mfpu=neon-vfpv4 -mfloat-abi=hard
 			CXXFLAGS += -mcpu=cortex-a7 -mfpu=neon-vfpv4 -mfloat-abi=hard
 		else ifneq (,$(findstring rpi3,$(platform)))
-			CFLAGS += -march=armv8-a+crc -mtune=cortex-a53 -mfpu=neon-fp-armv8 -mfloat-abi=hard
-			CXXFLAGS += -march=armv8-a+crc -mtune=cortex-a53 -mfpu=neon-fp-armv8 -mfloat-abi=hard
+			CFLAGS += -mtune=cortex-a53 -mfpu=neon-fp-armv8 -mfloat-abi=hard
+			CXXFLAGS += -mtune=cortex-a53 -mfpu=neon-fp-armv8 -mfloat-abi=hard
 		endif
 		CORE_DEFINES += -DLOW_END
 	endif
@@ -226,7 +229,7 @@ else ifeq ($(platform), classic_armv7_a7)
 	FORCE_GLES = 1
 	SINGLE_PREC_FLAGS = 1
 	HAVE_LTCG = 0
-	HAVE_OPENMP = 0
+	HAVE_OPENMP = 1
 	CFLAGS += -Ofast \
 	-flto=4 -fwhole-program -fuse-linker-plugin \
 	-fdata-sections -ffunction-sections -Wl,--gc-sections \
@@ -422,7 +425,7 @@ else ifeq ($(platform), libnx)
    WITH_DYNAREC=arm64
    HAVE_GENERIC_JIT = 0
    STATIC_LINKING = 1
-   HAVE_MODEM = 1
+   ENABLE_MODEM = 0
    HAVE_LTCG = 0
    NO_NVMEM = 1
    # stubs
@@ -823,7 +826,7 @@ else
 	TARGET := $(TARGET_NAME)_libretro.$(EXT)
 	LDFLAGS += -shared -static-libgcc -static-libstdc++ -Wl,--version-script=link.T -lwinmm -lgdi32
 	GL_LIB := -lopengl32
-	LIBS := -lws2_32
+	LIBS := -lws2_32 -liphlpapi
 	PLATFORM_EXT := win32
 	SINGLE_PREC_FLAGS=1
 	CC ?= gcc
@@ -939,8 +942,6 @@ else
 	ifeq ($(HAVE_LTCG), 1)
 		CORE_DEFINES   += -flto
 	endif
-
-	CORE_DEFINES      += -DRELEASE
 endif
 
 ifeq ($(HAVE_GL3), 1)
@@ -948,7 +949,7 @@ ifeq ($(HAVE_GL3), 1)
 	CORE_DEFINES += -DHAVE_GL3
 endif
 
-RZDCY_CFLAGS	+= $(CFLAGS) -c $(OPTFLAGS) -frename-registers -ffast-math -ftree-vectorize -fomit-frame-pointer 
+RZDCY_CFLAGS	+= $(CFLAGS) -c $(OPTFLAGS) -frename-registers -ftree-vectorize -fomit-frame-pointer 
 
 ifeq ($(WITH_DYNAREC), arm)
 	ifneq (,$(findstring odroid,$(platform)))
@@ -1019,7 +1020,7 @@ else
 	CXXFLAGS += -DTARGET_NO_OPENMP
 endif
 ifeq ($(platform), win)
-	LDFLAGS_END += -Wl,-Bstatic -lgmp -Wl,-Bstatic -lgomp -lwsock32
+	LDFLAGS_END += -Wl,-Bstatic -lgomp -lwsock32 -lws2_32 -liphlpapi
 endif
 	NEED_CXX11=1
 	NEED_PTHREAD=1
@@ -1055,7 +1056,7 @@ ifeq ($(NEED_CXX11), 1)
 endif
 
 ifeq ($(HAVE_CHD),1)
-CORE_DEFINES += -DFLAC__HAS_OGG=0 -DFLAC__NO_DLL -DHAVE_LROUND -DHAVE_STDINT_H -DHAVE_STDLIB_H -DHAVE_SYS_PARAM_H -D_7ZIP_ST -DUSE_FLAC -DUSE_LZMA
+CORE_DEFINES += -DHAVE_STDINT_H -DHAVE_STDLIB_H -DHAVE_SYS_PARAM_H -D_7ZIP_ST -DUSE_FLAC -DUSE_LZMA
 endif
 
 RZDCY_CFLAGS   += $(CORE_DEFINES)
@@ -1064,14 +1065,14 @@ CFLAGS         += $(CORE_DEFINES)
 CXXFLAGS       += $(CORE_DEFINES)
 
 CFLAGS   += $(OPTFLAGS) -c
-CFLAGS   += -fno-strict-aliasing -ffast-math
+CFLAGS   += -fno-strict-aliasing
 CXXFLAGS += -fno-rtti -fpermissive -fno-operator-names
 LIBS     += -lm 
 
 PREFIX        ?= /usr/local
 
 ifneq (,$(findstring arm, $(ARCH)))
-	CC_AS    = ${CC_PREFIX}gcc #The ngen_arm.S must be compiled with gcc, not as
+	CC_AS    = ${CC_PREFIX}${CC} #The ngen_arm.S must be compiled with gcc, not as
 	ASFLAGS  += $(CFLAGS)
 endif
 

@@ -62,7 +62,7 @@ s32 DYNACALL UNPACK(u16 val)
 	return uval;
 }
 
-void DecodeInst(u32 *IPtr,_INST *i)
+void DecodeInst(const u32 *IPtr, _INST *i)
 {
 	i->TRA = (IPtr[0] >> 9) & 0x7F;
 	i->TWT = IPtr[0] & 0x100;
@@ -766,24 +766,15 @@ void dsp_recompile()
 	x86e.Generate();
 }
 
-
-
-void dsp_print_mame();
-void dsp_step_mame();
-void dsp_emu_grandia();
 void dsp_step()
 {
-	//clear output reg
-	memset(DSPData->EFREG,0,sizeof(DSPData->EFREG));
-
 	if (dsp.dyndirty)
 	{
 		dsp.dyndirty=false;
-		//dsp_print_mame();
 		dsp_recompile();
 	}
-	//dsp_step_mame();
-	//dsp_emu_grandia();
+   if (dsp.Stopped)
+      return;   
 	
 	//run the code :p
 	((void (*)())&dsp.DynCode)();
